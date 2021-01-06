@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 2.1//EN" "http://tiles.apache.org/dtds/tiles-config_2_1.dtd">
+
+<tiles-definitions>
+	<!-- not default -->
+	<definition name="nodefault" template="/WEB-INF/views/layout/nodefaultLayout.jsp">
+	   <put-attribute name="content" value="" />
+	</definition>
+
+	<definition name="/import/*/*.tiles" extends="nodefault">
+		<put-attribute name="content" value="/WEB-INF/views/{1}/{2}.jsp" />
+	</definition>
+
+	<!-- default -->
+	<definition name="default" template="/WEB-INF/views/layout/defaultLayout.jsp">
+	   <put-attribute name="title" value="Homepage Management System" />
+	   <put-attribute name="header" value="/WEB-INF/views/layout/header.jsp" />
+	   <put-attribute name="lnb" value="/WEB-INF/views/layout/lnb.jsp" />
+	   <put-attribute name="content" value="" />
+	</definition>
+
+	<!-- v2 default -->
+	<definition name="default_v2" template="/WEB-INF/views/v2/layout/defaultLayout.jsp">
+	   <put-attribute name="title" value="Homepage Management System" />
+	   <put-attribute name="header" value="/WEB-INF/views/v2/layout/header.jsp" />
+	   <put-attribute name="content" value="" />
+	</definition>
+
+	<definition name="/*.tiles" extends="default">
+		<put-attribute name="content" value="/WEB-INF/views/{1}.jsp" />
+	</definition>
+
+	<definition name="/v2/*.tiles" extends="default_v2">
+		<put-attribute name="content" value="/WEB-INF/views/v2/{1}.jsp" />
+	</definition>
+
+	<definition name="/v2/abroad/*.tiles" extends="default_v2">
+		<put-attribute name="content" value="/WEB-INF/views/v2/abroad/{1}.jsp" />
+	</definition>
+
+	<definition name="/v2/popup/*.tiles" extends="nodefault">
+		<put-attribute name="content" value="/WEB-INF/views/v2/popup/{1}.jsp" />
+	</definition>
+
+	<definition name="/*/*.tiles" extends="default">
+		<put-attribute name="content" value="/WEB-INF/views/{1}/{2}.jsp" />
+	</definition>
+
+	<definition name="/*/*/*.tiles" extends="default">
+		<put-attribute name="content" value="/WEB-INF/views/{1}/{2}_{3}.jsp" />
+	</definition>
+	
+</tiles-definitions>

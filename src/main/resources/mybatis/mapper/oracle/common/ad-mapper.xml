@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.AdDao">
+	<select id="selectAdList" parameterType="search" resultType="ad">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.regTs DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		            A.BANNER_SEQ AS bannerSeq
+		            , A.GT_BANNER_LOCATION AS gtBannerLoc
+					, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_LOCATION) AS gtBannerLocNm
+					, A.GT_BANNER_TYPE AS gtBannerTyp
+					, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_TYPE) AS gtBannerTypNm
+		            , A.DEPT_SEQ AS deptSeq
+		            , (SELECT B.DEPT_NM FROM GAIMS.TB_DEPT B WHERE B.DEPT_SEQ = A.DEPT_SEQ) AS deptNm
+		            , A.TITLE AS title
+		            , TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+		            , A.REG_USER_SEQ AS regUserSeq
+		            , A.REG_USER_NM AS regUserNm
+		            , A.BANNER_IMG_PATH AS bannerImgPath
+		            , A.VIEW_START_DT AS startDt
+		            , A.VIEW_END_DT AS endDt
+		            , A.LINK_URL AS linkUrl
+		            , A.LINK_TARGET_FL AS linkTargetFl
+		            , A.USE_YN AS useYn
+		        FROM GOJLS.TB_BANNER A
+		        WHERE 1 = 1
+		        	AND A.GT_BANNER_LOCATION NOT IN ('BN1005')
+				]]>
+				<if test="searchDeptSeq != '' and searchDeptSeq != null "><![CDATA[ AND A.DEPT_SEQ = #{searchDeptSeq} ]]></if>
+				<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+				<if test="searchType != '' and searchType != null "><![CDATA[ AND A.GT_BANNER_LOCATION = #{searchType} ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{jtStartIndex} ) AND B1.rnum <= ( #{jtStartIndex} + #{jtPageSize} )	
+	]]>
+	</select>
+
+	<select id="selectAdListCnt" parameterType="search" resultType="integer">
+	<![CDATA[
+        SELECT
+            COUNT(1)
+		FROM GOJLS.TB_BANNER A
+		WHERE 1=1
+        	AND A.GT_BANNER_LOCATION NOT IN ('BN1005')
+		]]>
+		<if test="searchDeptSeq != '' and searchDeptSeq != null "><![CDATA[ AND A.DEPT_SEQ = #{searchDeptSeq} ]]></if>
+		<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+		<if test="searchType != '' and searchType != null "><![CDATA[ AND A.GT_BANNER_LOCATION = #{searchType} ]]></if>
+	</select>
+
+	<select id="selectDirectList" parameterType="search" resultType="ad">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.regTs DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		            A.BANNER_SEQ AS bannerSeq
+		            , A.GT_BANNER_LOCATION AS gtBannerLoc
+					, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_LOCATION) AS gtBannerLocNm
+					, A.GT_BANNER_TYPE AS gtBannerTyp
+					, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_TYPE) AS gtBannerTypNm
+		            , A.DEPT_SEQ AS deptSeq
+					, ( CASE 
+                        WHEN NVL(( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1),' ') = ' ' THEN 
+                            (SELECT D.DEPT_NM FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ=A.DEPT_SEQ)
+                        ELSE 
+                            ( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1)
+                        END
+                        ) AS deptNm
+		            , A.TITLE AS title
+		            , TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+		            , A.REG_USER_SEQ AS regUserSeq
+		            , A.REG_USER_NM AS regUserNm
+		            , A.BANNER_IMG_PATH AS bannerImgPath
+		            , A.VIEW_START_DT AS startDt
+		            , A.VIEW_END_DT AS endDt
+		            , A.LINK_URL AS linkUrl
+		            , A.LINK_TARGET_FL AS linkTargetFl
+		            , A.USE_YN AS useYn
+		        FROM GOJLS.TB_BANNER A
+		        WHERE 1 = 1
+				]]>
+				<if test="searchDeptSeq != '' and searchDeptSeq != null ">
+					<if test="searchDeptSeq == '120' or searchDeptSeq == '130'">
+					<![CDATA[ AND (A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ = #{searchDeptSeq})) OR (A.DEPT_SEQ = #{searchDeptSeq}) )]]>
+					</if>
+					<if test="searchDeptSeq != '120' and searchDeptSeq != '130'">
+					<![CDATA[ 
+						AND ( 
+							A.DEPT_SEQ IN
+							]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+							OR A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DELEGATE_WEB_DEPT_SEQ IN 
+							]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+							)
+						) 
+					]]>
+					</if>
+		        </if>				
+				<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+				<if test="searchType != '' and searchType != null "><![CDATA[ AND A.GT_BANNER_LOCATION = #{searchType} ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{jtStartIndex} ) AND B1.rnum <= ( #{jtStartIndex} + #{jtPageSize} )	
+	]]>
+	</select>
+
+	<select id="selectDirectListCnt" parameterType="search" resultType="integer">
+	<![CDATA[
+        SELECT
+            COUNT(1)
+		FROM GOJLS.TB_BANNER A
+		WHERE 1=1
+		]]>
+		<if test="searchDeptSeq != '' and searchDeptSeq != null ">
+			<if test="searchDeptSeq == '120' or searchDeptSeq == '130'">
+			<![CDATA[ AND (A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ = #{searchDeptSeq})) OR (A.DEPT_SEQ = #{searchDeptSeq}) )]]>
+			</if>
+			<if test="searchDeptSeq != '120' and searchDeptSeq != '130'">
+			<![CDATA[ 
+				AND ( 
+					A.DEPT_SEQ IN
+					]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+					OR A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DELEGATE_WEB_DEPT_SEQ IN 
+					]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+					)
+				) 
+			]]>
+			</if>
+        </if>				
+		<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+		<if test="searchType != '' and searchType != null "><![CDATA[ AND A.GT_BANNER_LOCATION = #{searchType} ]]></if>
+	</select>
+	
+	<select id="selectAdCode" parameterType="String" resultType="ad">
+	<![CDATA[ SELECT COMMON_CODE AS commonCode, KOR_CODE_NAME AS codeNm FROM GAIMS.GT_CODE WHERE GROUP_CODE = #{ad_code} ORDER BY COMMON_CODE ]]>
+	</select>
+
+	<select id="selectAdSubCode" parameterType="String" resultType="ad">
+	<![CDATA[ SELECT COMMON_CODE AS commonCode, KOR_CODE_NAME AS codeNm FROM GAIMS.GT_CODE WHERE BEFORE_CODE = #{ad_code} ORDER BY COMMON_CODE ]]>
+	</select>
+	
+	<insert id="inAd" parameterType="ad">
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BANNER 
+		    (BANNER_SEQ, GT_BANNER_LOCATION, GT_BANNER_TYPE, DEPT_SEQ, TITLE, REG_TS, REG_USER_SEQ, REG_USER_NM, BANNER_IMG_PATH, VIEW_START_DT, VIEW_END_DT, USE_YN, LINK_URL, LINK_TARGET_FL)
+		VALUES
+		    (BANNER_SEQ.NEXTVAL, #{gtBannerLoc}, #{gtBannerTyp}, #{deptSeq}, #{title}, SYSTIMESTAMP, #{regUserSeq}, #{regUserNm}, #{bannerImgPath}, #{startDt}, #{endDt}, 1, #{linkUrl}, #{linkTargetFl})
+	]]>
+	</insert>
+	
+	<update id="upAd" parameterType="ad">
+	<![CDATA[
+		UPDATE GOJLS.TB_BANNER SET
+		    TITLE = #{title}, BANNER_IMG_PATH = #{bannerImgPath}, VIEW_START_DT=#{startDt}, VIEW_END_DT=#{endDt}
+		    , LINK_URL = #{linkUrl}, LINK_TARGET_FL=#{linkTargetFl}, MOD_TS=SYSTIMESTAMP, MOD_USER_SEQ = #{regUserSeq}, MOD_USER_NM=#{regUserNm}
+		WHERE BANNER_SEQ = #{bannerSeq}	
+	]]>
+	</update>
+	
+	<select id="checkAd" parameterType="ad" resultType="integer">
+	<![CDATA[
+		SELECT COUNT(1) FROM GOJLS.TB_BANNER 
+		WHERE #{startDt} >= VIEW_START_DT
+		    AND #{startDt} <= VIEW_END_DT
+		    AND DEPT_SEQ = #{deptSeq}
+		    AND GT_BANNER_LOCATION = #{gtBannerLoc}
+		    AND GT_BANNER_TYPE = #{gtBannerTyp}	
+	]]>
+	</select>
+
+	<select id="selectAdView" parameterType="integer" resultType="ad">
+	<![CDATA[
+		SELECT
+			A.BANNER_SEQ AS bannerSeq
+			, A.GT_BANNER_LOCATION AS gtBannerLoc
+			, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_LOCATION) AS gtBannerLocNm
+			, A.GT_BANNER_TYPE AS gtBannerTyp
+			, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_TYPE) AS gtBannerTypNm
+			, A.DEPT_SEQ AS deptSeq
+			, ( CASE 
+				WHEN NVL(( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1),' ') = ' ' THEN 
+					(SELECT D.DEPT_NM FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ=A.DEPT_SEQ)
+				ELSE 
+					( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1)
+				END
+			) AS deptNm
+			, A.TITLE AS title
+			, TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+			, A.REG_USER_SEQ AS regUserSeq
+			, A.REG_USER_NM AS regUserNm
+			, A.BANNER_IMG_PATH AS bannerImgPath
+			, A.VIEW_START_DT AS startDt
+			, A.VIEW_END_DT AS endDt
+			, A.LINK_URL AS linkUrl
+		    , A.LINK_TARGET_FL AS linkTargetFl
+		    , A.USE_YN AS useYn
+		FROM GOJLS.TB_BANNER A
+		WHERE BANNER_SEQ = #{bannerSeq}	
+	]]>
+	</select>
+</mapper>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+	<settings>
+		<setting name="callSettersOnNulls" value="true"/>
+		<setting name="jdbcTypeForNull" value="NULL" />
+  	</settings>
+	<typeAliases>
+		<typeAlias alias="emp" type="com.gojls.manage.member.model.EmpModel"/>
+		<typeAlias alias="news" type="com.gojls.manage.common.model.NewsModel"/>
+		<typeAlias alias="search" type="com.gojls.manage.common.model.SearchModel"/>
+		<typeAlias alias="tag" type="com.gojls.manage.common.model.TagModel"/>
+		<typeAlias alias="dept" type="com.gojls.manage.common.model.DeptModel"/>
+		<typeAlias alias="ad" type="com.gojls.manage.common.model.AdModel"/>
+		<typeAlias alias="unionedept" type="com.gojls.manage.common.model.UnioneDeptModel"/>
+		<typeAlias alias="schLog" type="com.gojls.manage.common.model.ScheduleLogModel" />
+		
+		<typeAlias alias="banner" type="com.gojls.manage.common.model.v2_BannerModel" />
+		<typeAlias alias="sch" type="com.gojls.manage.common.model.v2_SearchModel"/>
+		<typeAlias alias="branch" type="com.gojls.manage.common.model.v2_DeptModel"/>
+		<typeAlias alias="sync" type="com.gojls.manage.common.model.v2_SyncModel"/>
+		<typeAlias alias="notice" type="com.gojls.manage.common.model.v2_NewsModel"/>
+		<typeAlias alias="tagcode" type="com.gojls.manage.common.model.v2_TagModel"/>
+		<typeAlias alias="unione_vo" type="com.gojls.manage.common.model.v2_SyncUnioneModel"/>
+		<typeAlias alias="schlog_vo" type="com.gojls.manage.common.model.v2_ScheduleLogModel"/>
+		
+		<typeAlias alias="site_menu" type="com.gojls.manage.common.model.v2_SiteMenuModel"/>
+		<typeAlias alias="site_banner" type="com.gojls.manage.common.model.v2_SiteBannerModel"/>
+		<typeAlias alias="site_partner" type="com.gojls.manage.common.model.v2_SitePartnerModel"/>
+		<typeAlias alias="site_manager" type="com.gojls.manage.common.model.v2_SiteManagerModel"/>
+		<typeAlias alias="site_program" type="com.gojls.manage.common.model.v2_SiteProgramModel"/>
+
+		<typeAlias alias="site_tag" type="com.gojls.manage.common.model.v2_SiteTagModel"/>
+		<typeAlias alias="site_search" type="com.gojls.manage.common.model.v2_SiteSearchModel"/>
+		<typeAlias alias="site_content" type="com.gojls.manage.common.model.v2_SiteContentModel"/>
+		<typeAlias alias="site_counsel" type="com.gojls.manage.common.model.v2_SiteCounselModel"/> 
+		<typeAlias alias="site_file" type="com.gojls.manage.common.model.v2_SiteFileModel"/> 
+		<typeAlias alias="site_report" type="com.gojls.manage.common.model.v2_SiteReportModel"/> 
+		
+		<typeAlias alias="reserve_mst" type="com.gojls.manage.common.model.v2_ReserveMstModel"/>
+		<typeAlias alias="reserve_program" type="com.gojls.manage.common.model.v2_ReserveProgramModel"/>
+		<typeAlias alias="reserve_seminar_us" type="com.gojls.manage.common.model.v2_ReserveSeminarUserModel"/>
+		<typeAlias alias="reserve_camp_us" type="com.gojls.manage.common.model.v2_ReserveCampUserModel"/>
+				
+		<typeAlias alias="ir" type="com.gojls.manage.common.model.v2_IRModel"/>
+		<typeAlias alias="ir_file" type="com.gojls.manage.common.model.v2_IRFileModel"/>		 
+	</typeAliases>
+</configuration>

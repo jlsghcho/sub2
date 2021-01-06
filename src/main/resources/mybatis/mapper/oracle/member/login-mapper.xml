@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.member.dao.LoginDao">
+	
+	<select id="selectGetEmp" parameterType="emp" resultType="emp">
+	<![CDATA[
+		SELECT B.EMP_SEQ AS empSeq
+			, B.EMP_ID AS empId
+			, B.EMP_NM AS empNm
+			, B.GT_EMP_TYPE AS gtEmpType
+			, B.USE_YN AS useYn
+			, TO_CHAR(B.LOGIN_ACCESS_HMS_YN) AS loginAccessHmsYn
+			, NVL((SELECT A.USER_TYPE FROM GOJLS.TB_BRANCH_ADMIN A WHERE A.USER_SEQ = B.EMP_SEQ AND A.USE_YN=1),0) AS mngEmpType
+			, NVL((SELECT A.ROLE_CD FROM GAIMS.GT_ROLE_USER A WHERE A.EMP_SEQ = B.EMP_SEQ ),0) AS roleCd
+			, (SELECT C.GT_ACCESS_LEVEL FROM GAIMS.GT_ROLE_USER A , GAIMS.GT_ROLE C WHERE A.EMP_SEQ = B.EMP_SEQ AND A.ROLE_CD = C.ROLE_CD ) AS accessLevel
+		FROM GAIMS.TB_US_EMP B 
+		WHERE B.USE_YN = 1
+			AND B.EMP_ID = #{empId}
+			AND EN_PASS_WD = GAIMS.PASSWD_SHA256(CONCAT(#{empId},#{passWd}))
+	]]>
+	</select>
+	
+	<select id="selectGetEmpExt" parameterType="emp" resultType="emp">
+	<![CDATA[
+		SELECT B.EMP_SEQ AS empSeq
+			, B.EMP_ID AS empId
+			, B.EMP_NM AS empNm
+			, B.GT_EMP_TYPE AS gtEmpType
+			, B.USE_YN AS useYn
+			, TO_CHAR(B.LOGIN_ACCESS_HMS_YN) AS loginAccessHmsYn
+			, NVL((SELECT A.USER_TYPE FROM GOJLS.TB_BRANCH_ADMIN A WHERE A.USER_SEQ = B.EMP_SEQ AND A.USE_YN=1),0) AS mngEmpType
+			, (SELECT C.GT_ACCESS_LEVEL FROM GAIMS.GT_ROLE_USER A , GAIMS.GT_ROLE C WHERE A.EMP_SEQ = B.EMP_SEQ AND A.ROLE_CD = C.ROLE_CD ) AS accessLevel
+		FROM GAIMS.TB_US_EMP B
+		WHERE B.USE_YN = 1
+			AND B.EMP_SEQ = #{empSeq}
+			AND EN_PASS_WD = #{enPassWd}
+	]]>
+	</select>
+	
+	<select id="selectGetEmpDept" parameterType="String" resultType="emp">
+	<![CDATA[ 
+		SELECT 
+		    C.DELEGATE_WEB_DEPT_SEQ AS deptSeq, 
+			C.DELEGATE_WEB_NAME AS deptNm 
+		FROM GAIMS.TB_DEPT C
+		WHERE C.DEPT_SEQ IN (
+		    SELECT B.DELEGATE_WEB_DEPT_SEQ 
+		    FROM GAIMS.TB_DEPT B 
+		    WHERE B.DEPT_SEQ IN (
+		        SELECT A.DEPT_SEQ   
+		        FROM GAIMS.TB_DEPT_EMP A 
+		        WHERE A.EMP_SEQ = #{param_emp_seq}
+		            AND A.USE_YN = 1 
+		        )
+		    )
+		GROUP BY C.DELEGATE_WEB_DEPT_SEQ, C.DELEGATE_WEB_NAME 
+		ORDER BY C.DELEGATE_WEB_NAME
+	]]>
+	</select>
+	
+	<select id="selectAuthMenuList" parameterType="emp" resultType="Map">
+	<![CDATA[
+		SELECT PR.PAGE_CD AS menuUrl
+		FROM GAIMS.GT_ROLE_USER RU, GAIMS.GT_ROLE_PERM RP, GAIMS.GT_PROGRAM PR
+		WHERE RU.ROLE_CD = RP.ROLE_CD
+		AND RP.PGM_CD = PR.PGM_CD
+		AND PR.UP_PGM_CD IN (
+		   SELECT PGM_CD FROM GAIMS.GT_PROGRAM
+		    WHERE up_pgm_cd = 'HMSA'
+		)    
+		AND PR.RUN_YN = 'Y'  
+		AND RU.EMP_SEQ = #{empSeq}
+		ORDER BY SORT_SEQ 
+	]]>
+	</select>
+	
+	
+</mapper>

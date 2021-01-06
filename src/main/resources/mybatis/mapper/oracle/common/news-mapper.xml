@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.NewsDao">
+	<select id="selectNewsList" parameterType="search" resultType="news">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.regTs DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		            A.BRANCH_NOTICE_SEQ AS noticeSeq
+		            , B.BRANCH_NOTICE_CONTNT_SEQ AS noticeContntSeq
+		            , A.DEPT_SEQ AS deptSeq
+					, ( CASE 
+                        WHEN NVL(( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1),' ') = ' ' THEN 
+                            (SELECT D.DEPT_NM FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ=A.DEPT_SEQ)
+                        ELSE 
+                            ( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1)
+                        END
+                        ) AS deptNm
+		            , B.TITLE AS title
+		            , A.VIEW_CNT AS viewCnt
+		            , A.VIEW_YN AS viewYn
+		            , A.REG_USER_SEQ AS regUserSeq
+		            , A.REG_USER_NM AS regUserNm
+		            , TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+		            , A.START_DT AS startDt
+		            , A.END_DT AS endDt
+   		        FROM GOJLS.TB_BRANCH_NOTICE A
+		            , GOJLS.TB_BRANCH_NOTICE_CONTNT B
+		        WHERE A.BRANCH_NOTICE_CONTNT_SEQ = B.BRANCH_NOTICE_CONTNT_SEQ
+		            AND A.USE_YN = 1
+				]]>
+				<if test="searchBranchType != '' and searchBranchType != null ">
+					<if test="searchBranchType == 1"><![CDATA[ AND A.DEPT_SEQ IN (1,120,130) ]]></if>
+					<if test="searchBranchType == 2"><![CDATA[AND A.DEPT_SEQ NOT IN (1,120,130) ]]></if>
+				</if>
+				<if test="searchDeptSeq != '' and searchDeptSeq != null ">
+					<if test="searchDeptSeq == '120' or searchDeptSeq == '130'">
+					<![CDATA[ AND (A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ = #{searchDeptSeq})) OR (A.DEPT_SEQ = #{searchDeptSeq}) )]]>
+					</if>
+					<if test="searchDeptSeq != '120' and searchDeptSeq != '130'">
+					<![CDATA[ 
+						AND ( 
+							A.DEPT_SEQ IN
+							]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+							OR A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DELEGATE_WEB_DEPT_SEQ IN 
+							]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+							)
+							OR A.DEPT_SEQ IN (SELECT C.PARENT_DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ IN (SELECT C.PARENT_DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ IN
+							]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[ 
+							))							
+						) 
+					]]>
+					</if>
+		        </if>
+				<if test="searchStartDt != '' and searchStartDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') >= #{searchStartDt} ]]></if>
+				<if test="searchEndDt != '' and searchEndDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') <= #{searchEndDt} ]]></if>
+				<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND B.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+				<if test="searchTag != '' and searchTag != null ">
+					<![CDATA[ 
+					AND EXISTS(
+						SELECT * FROM TB_BRANCH_NOTICE_TAG C, TB_BRANCH_TAG D 
+						WHERE C.BRANCH_NOTICE_CONTNT_SEQ = A.BRANCH_NOTICE_CONTNT_SEQ 
+							AND C.BRANCH_TAG_CODE = D.BRANCH_TAG_CODE 
+							AND C.BRANCH_TAG_CODE = #{searchTag} 
+							AND D.VIEW_YN=1
+					) 
+					]]>
+				</if>
+				<if test="searchViewYn != '' and searchViewYn != null ">
+				<![CDATA[ AND ( A.VIEW_YN = #{searchViewYn} ]]>
+					<if test="searchViewYn == 1"><![CDATA[ AND ( A.END_DT IS NULL OR A.END_DT >= TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD'))) ]]></if>
+					<if test="searchViewYn == 0"><![CDATA[ OR ( A.END_DT IS NOT NULL AND A.END_DT < TO_CHAR(SYSDATE,'YYYY-MM-DD'))) ]]></if>
+				</if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{jtStartIndex} ) AND B1.rnum <= ( #{jtStartIndex} + #{jtPageSize} )	
+	]]>
+	</select>
+
+	<select id="selectNewsListCnt" parameterType="search" resultType="integer">
+	<![CDATA[
+        SELECT
+            COUNT(1)
+		FROM GOJLS.TB_BRANCH_NOTICE A
+			, GOJLS.TB_BRANCH_NOTICE_CONTNT B
+		WHERE A.BRANCH_NOTICE_CONTNT_SEQ = B.BRANCH_NOTICE_CONTNT_SEQ
+			AND A.USE_YN = 1
+		]]>
+		<if test="searchBranchType != '' and searchBranchType != null ">
+			<if test="searchBranchType == 1"><![CDATA[ AND A.DEPT_SEQ IN (1,120,130) ]]></if>
+			<if test="searchBranchType == 2"><![CDATA[AND A.DEPT_SEQ NOT IN (1,120,130) ]]></if>
+		</if>
+		<if test="searchDeptSeq != '' and searchDeptSeq != null ">
+			<if test="searchDeptSeq == '120' or searchDeptSeq == '130'">
+			<![CDATA[ AND (A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.PARENT_DEPT_SEQ = #{searchDeptSeq})) OR (A.DEPT_SEQ = #{searchDeptSeq}) )]]>
+			</if>
+			<if test="searchDeptSeq != '120' and searchDeptSeq != '130'">
+			<![CDATA[ 
+				AND ( 
+					A.DEPT_SEQ IN
+					]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+					OR A.DEPT_SEQ IN (SELECT C.DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DELEGATE_WEB_DEPT_SEQ IN 
+					]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[
+					)
+					OR A.DEPT_SEQ IN (SELECT C.PARENT_DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ IN (SELECT C.PARENT_DEPT_SEQ FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ IN
+					]]><foreach item="item" index="index" collection="searchDeptArr" open="(" separator="," close=")">#{item}</foreach><![CDATA[ 
+					))							
+				) 
+			]]>
+			</if>
+        </if>
+		<if test="searchStartDt != '' and searchStartDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') >= #{searchStartDt} ]]></if>
+		<if test="searchEndDt != '' and searchEndDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') <= #{searchEndDt} ]]></if>
+		<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND B.TITLE LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+		<if test="searchTag != '' and searchTag != null ">
+			<![CDATA[ 
+					AND EXISTS(
+						SELECT * FROM TB_BRANCH_NOTICE_TAG C, TB_BRANCH_TAG D 
+						WHERE C.BRANCH_NOTICE_CONTNT_SEQ = A.BRANCH_NOTICE_CONTNT_SEQ 
+							AND C.BRANCH_TAG_CODE = D.BRANCH_TAG_CODE 
+							AND C.BRANCH_TAG_CODE = #{searchTag} 
+							AND D.VIEW_YN=1
+					) 
+			]]>
+		</if>
+		<if test="searchViewYn != '' and searchViewYn != null ">
+		<![CDATA[ AND ( A.VIEW_YN = #{searchViewYn} ]]>
+			<if test="searchViewYn == 1"><![CDATA[ AND ( A.END_DT IS NULL OR A.END_DT >= TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD'))) ]]></if>
+			<if test="searchViewYn == 0"><![CDATA[ OR ( A.END_DT IS NOT NULL AND A.END_DT < TO_CHAR(SYSDATE,'YYYY-MM-DD'))) ]]></if>
+		</if>
+	</select>
+	
+	<select id="selectNewsTag" resultType="tag">
+	<![CDATA[ SELECT A.BRANCH_TAG_CODE AS tagCode, A.TAG_NM AS tagNm FROM GOJLS.TB_BRANCH_TAG A WHERE A.VIEW_YN=1 ORDER BY A.TAG_NM ASC ]]>
+	</select>
+	
+	<select id="selectNewsView" parameterType="int" resultType="news">
+	<![CDATA[
+		SELECT
+			A.BRANCH_NOTICE_SEQ AS noticeSeq
+			, B.BRANCH_NOTICE_CONTNT_SEQ AS noticeContntSeq
+			, DECODE(A.DEPT_SEQ,'1','JLS소식','분원소식') AS noticeTypeNm
+			, ( SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT C, GAIMS.TB_DEPT D WHERE C.DEPT_SEQ = A.DEPT_SEQ AND C.DELEGATE_WEB_DEPT_SEQ = D.DELEGATE_WEB_DEPT_SEQ AND D.DELEGATE_WEB_YN = 1) AS deptNm
+			, A.DEPT_SEQ AS deptSeq
+			, B.TITLE AS title
+            , B.CONTENTS AS contents
+            , B.THUMBNAIL_PATH AS thumbPath
+			, A.VIEW_CNT AS viewCnt
+			, A.VIEW_YN AS viewYn
+			, A.REG_USER_SEQ AS regUserSeq
+			, A.REG_USER_NM AS regUserNm
+			, TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+			, A.START_DT AS startDt
+			, A.END_DT AS endDt
+			, B.SUMMARY AS summary
+		FROM GOJLS.TB_BRANCH_NOTICE A
+			, GOJLS.TB_BRANCH_NOTICE_CONTNT B
+		WHERE A.BRANCH_NOTICE_SEQ = #{param_seq}
+			AND A.BRANCH_NOTICE_CONTNT_SEQ = B.BRANCH_NOTICE_CONTNT_SEQ 
+	]]>
+	</select>
+	
+	<select id="selectNewsTagView" parameterType="int" resultType="tag">
+	<![CDATA[
+	    SELECT C.BRANCH_TAG_CODE AS tagCode, D.TAG_NM AS tagNm
+	    FROM GOJLS.TB_BRANCH_NOTICE_TAG C 
+	        , GOJLS.TB_BRANCH_TAG D 
+	    WHERE C.BRANCH_NOTICE_CONTNT_SEQ = #{param_contnt_seq}
+	        AND C.BRANCH_TAG_CODE = D.BRANCH_TAG_CODE
+	        AND D.VIEW_YN=1
+	]]>
+	</select>
+	
+	<insert id="insNews" parameterType="news">
+		<selectKey keyProperty="noticeSeq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_NOTICE_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BRANCH_NOTICE(BRANCH_NOTICE_SEQ, DEPT_SEQ, START_DT, END_DT, REG_TS, REG_USER_SEQ, REG_USER_NM, VIEW_YN, VIEW_CNT, USE_YN, NOTICE_TYPE_CODE, BRANCH_NOTICE_CONTNT_SEQ)
+		VALUES(#{noticeSeq}, #{deptSeq}, #{startDt}, #{endDt}, SYSTIMESTAMP, #{regUserSeq}, #{regUserNm}, #{viewYn}, 0, 1, 'NT1001', #{noticeContntSeq})
+	]]>
+	</insert>
+	
+	<insert id="insNewsContnt" parameterType="news">
+		<selectKey keyProperty="noticeContntSeq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_NOTICE_CONTNT_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BRANCH_NOTICE_CONTNT (BRANCH_NOTICE_CONTNT_SEQ, TITLE, THUMBNAIL_PATH, CONTENTS, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, TOP_ORDER, DEPT_VIEW_YN, SUMMARY)
+		VALUES (#{noticeContntSeq}, #{title}, #{thumbPath}, #{contents}, SYSTIMESTAMP, #{regUserSeq}, '', #{regUserNm}, 0, 1, #{summary})	
+	]]>
+	</insert>
+	
+	<update id="upNews" parameterType="news">
+	<![CDATA[
+		UPDATE GOJLS.TB_BRANCH_NOTICE SET
+    		START_DT=#{startDt}, DEPT_SEQ=#{deptSeq}, END_DT=#{endDt}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{regUserSeq}, MOD_USER_NM=#{regUserNm}, VIEW_YN= #{viewYn}
+		WHERE BRANCH_NOTICE_SEQ = #{noticeSeq}
+	]]>
+	</update>
+	
+	<update id="upNewsContnt" parameterType="news">
+	<![CDATA[
+		UPDATE GOJLS.TB_BRANCH_NOTICE_CONTNT SET
+    		TITLE=#{title}, THUMBNAIL_PATH=#{thumbPath}, CONTENTS=#{contents}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{regUserSeq}, MOD_USER_NM=#{regUserNm}, SUMMARY=#{summary}
+		WHERE BRANCH_NOTICE_CONTNT_SEQ = #{noticeContntSeq}
+	]]>
+	</update>
+	
+	<delete id="delTagContnt" parameterType="integer">
+	<![CDATA[ DELETE FROM GOJLS.TB_BRANCH_NOTICE_TAG WHERE BRANCH_NOTICE_CONTNT_SEQ = #{branchContentSeq} ]]>
+	</delete>
+	
+	<insert id="insTagContnt" parameterType="java.util.Map">
+		INSERT ALL 
+		<foreach collection="data" item="item" index="index">
+			INTO GOJLS.TB_BRANCH_NOTICE_TAG(BRANCH_TAG_CODE, BRANCH_NOTICE_CONTNT_SEQ) VALUES (#{item.tagCode}, #{item.branchContentSeq})
+		</foreach>
+		SELECT * FROM DUAL
+	</insert>
+</mapper>

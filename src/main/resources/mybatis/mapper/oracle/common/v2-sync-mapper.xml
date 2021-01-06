@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_SyncDao">
+	<select id="select_sync_list" parameterType="sch" resultType="sync">
+	<![CDATA[
+		SELECT
+		    D.* 
+		FROM (
+		    SELECT
+		        ROW_NUMBER() OVER(ORDER BY C.DEPT_NM ASC) AS rnum
+		        , C.* 
+		    FROM (
+		        SELECT
+		            A.DEPT_SEQ AS dept_seq
+		            , A.DEPT_NM AS dept_nm
+		            , A.DEPT_NM_MOBILE AS dept_mobile_nm
+		            , A.BOSS_NM AS boss_nm
+		            , A.TEL1 AS dept_tel
+		            , (CASE WHEN NVL(A.DEPT_DESCS_MOBILE,'') = '' THEN 0 ELSE 1 END) AS dept_intro
+		            , A.ZIPCODE AS zip_code
+		            , B.CORP_NM AS corp_nm
+		            , B.STATUS AS status
+		        FROM GAIMS.TB_DEPT A 
+		            LEFT OUTER JOIN TB_BRANCH_DEPT_API B ON A.DEPT_SEQ = B.DEPT_SEQ
+		        WHERE A.USE_YN = 1
+		            AND A.GT_WEB_OPEN = 'DP1001' 
+					AND A.GT_DEPT_COURSE IN 
+				]]>
+        		<foreach collection="search_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+				<if test="search_context != '' and search_context != null "><![CDATA[ AND A.DEPT_NM LIKE '%'|| #{search_context} ||'%' ]]></if>
+				<![CDATA[
+		    ) C
+		) D
+		WHERE D.rnum > ( #{page_start_num} * #{page_size} ) AND D.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+	]]>
+	</select>
+	
+	<select id="select_sync_dept_list" parameterType="sync" resultType="unione_vo">
+	<![CDATA[
+		WITH DEPT_TMP AS (
+		SELECT 
+			D.DEPT_SEQ AS organizationNo
+			, DC.DEPT_NM_MOBILE AS name
+			, DC.BOSS_NM AS ownerName
+			, DC.DEPT_DESCS_MOBILE AS description
+			, DC.TEL1 AS phoneNumber
+			, DC.ZIPCODE AS postCode
+			, DC.ADDR1 || ' ' || DC.ADDR2 AS address
+			, (#{param_link_url} ||'?'|| D.DEPT_SEQ) AS url
+			, ROW_NUMBER() OVER(PARTITION BY D.DEPT_SEQ ORDER BY DC.DEPT_CONTACT_SEQ) AS RN
+		FROM GAIMS.TB_DEPT D, GAIMS.TB_DEPT_CONTACT DC
+		WHERE D.DEPT_SEQ = DC.DEPT_SEQ AND D.DEPT_SEQ IN 
+		]]>
+		<foreach collection="param_dept_arr" item="dept_seq" separator="," open="(" close=")">#{dept_seq}</foreach>
+		<![CDATA[
+		)
+		SELECT * FROM DEPT_TMP 
+		WHERE RN = 1 
+		]]>
+	</select>
+	
+	<insert id="insert_schedule_log" parameterType="schlog_vo" >
+	<![CDATA[
+		INSERT INTO JLSAPI.TB_API_SCHEDULE_LOG(API_SCHEDULE_SEQ, PARTNER_NM, EVENT_CODE, EVENT_SUB_CODE, TRAN_TYPE, TRAN_SEQ, TRAN_RESULT, TRAN_MSG, REG_TS )
+		VALUES(JLSAPI.API_SCHEDULE_SEQ.NEXTVAL, #{partner_nm}, #{event_code}, #{event_sub_code}, #{tran_type}, #{tran_seq}, #{tran_result},#{tran_msg}, SYSTIMESTAMP )
+	]]>
+	</insert>
+	
+	<insert id="marge_dept_api" parameterType="unione_vo">
+	<![CDATA[
+		MERGE INTO GOJLS.TB_BRANCH_DEPT_API
+		USING DUAL
+		ON (DEPT_SEQ = #{dept_seq})
+		WHEN MATCHED THEN 
+			UPDATE SET
+				STATUS = #{status}
+				, MOD_USER_SEQ = #{reg_user_seq}
+				, MOD_USER_ID = #{reg_user_id}
+				, MOD_USER_NM = #{reg_user_nm}
+		WHEN NOT MATCHED THEN 
+			INSERT (DEPT_SEQ, CORP_NM, STATUS, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+			VALUES (#{dept_seq}, #{corp_nm}, #{status}, sysdate, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert>	
+</mapper>

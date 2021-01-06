@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_IRDao">
+	
+	<resultMap id="ir_map" type="ir">
+		<id property="ir_board_seq" column="IR_BOARD_SEQ" />
+		<result property="ir_type" column="IR_TYPE" />
+		<result property="title" column="TITLE" />
+		<result property="view_cnt" column="VIEW_CNT" />
+		<result property="use_yn" column="USE_YN" />
+		<result property="reg_user_seq" column="REG_USER_SEQ" />
+		<result property="reg_user_nm" column="REG_USER_NM" />
+		<result property="reg_ts" column="REG_TS" />
+		<collection property="ir_file_list" ofType="ir_file">
+			<id property="ir_board_file_seq" column="IR_BOARD_FILE_SEQ" />
+			<result property="file_nm" column="FILE_NM" />
+			<result property="file_path" column="FILE_PATH" />
+		</collection>
+	</resultMap>
+	
+	<select id="select_ir_list" parameterType="site_search" resultType="ir">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.reg_ts DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		        	A.IR_BOARD_SEQ AS ir_board_seq
+		        	,A.IR_TYPE AS ir_type
+		        	,A.TITLE AS title
+		        	,A.VIEW_START_DT AS view_start_dt
+		        	,A.VIEW_END_DT AS view_end_dt
+		        	,A.USE_YN AS user_yn
+		            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS reg_ts
+		        	,A.REG_USER_SEQ AS reg_user_seq
+		        	,A.REG_USER_NM AS reg_user_nm
+   		        FROM GOJLS.TB_IR_BOARD A
+		        WHERE A.IR_TYPE IN
+			]]>
+	        	<foreach collection="search_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+				<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') >= #{search_start_dt} ]]></if>
+				<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') <= #{search_end_dt} ]]></if>
+				<if test="search_context != '' and search_context != null "><![CDATA[ AND ( A.REG_USER_NM LIKE '%'|| #{search_context} ||'%' OR A.TITLE LIKE '%'|| #{search_context} ||'%' )]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{page_start_num} * #{page_size} ) AND B1.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY B1.rnum 	
+	]]>
+	</select>
+	
+	<insert id="insert_ir_board" parameterType="ir">
+		<selectKey keyProperty="ir_board_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.IR_BOARD_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_IR_BOARD(IR_BOARD_SEQ,IR_TYPE,TITLE,CONTENT,VIEW_START_DT,VIEW_CNT,USE_YN,REG_TS,REG_USER_SEQ,REG_USER_NM)
+		VALUES(#{ir_board_seq}, #{site_type}, #{title}, #{editor_txt}, #{view_start_dt}, 0, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm})
+	]]>
+	</insert>
+		
+	<update id="update_ir_board" parameterType="ir">
+	<![CDATA[
+		UPDATE GOJLS.TB_IR_BOARD SET
+    		IR_TYPE=#{ir_type}, TITLE=#{title}, CONTENT=#{editor_txt}, VIEW_END_DT=#{view_end_dt}, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_NM=#{reg_user_nm}
+		WHERE IR_BOARD_SEQ = #{ir_board_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_ir_board" parameterType="int">
+	<![CDATA[ DELETE FROM TB_IR_BOARD WHERE IR_BOARD_SEQ = #{ir_board_seq} ]]>
+	</delete>
+		
+	<insert id="insert_ir_board_file" parameterType="ir_file">
+		<selectKey keyProperty="ir_board_file_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.IR_BOARD_FILE_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_IR_BOARD_FILE(IR_BOARD_FILE_SEQ,IR_BOARD_SEQ,FILE_NM,FILE_PATH,USE_YN)
+		VALUES(#{ir_board_file_seq} ,#{ir_board_seq}, #{file_nm}, #{file_path}, 1)
+	]]>
+	</insert>
+	
+	<delete id="delete_ir_board_file" parameterType="ir_file">
+	<![CDATA[ 
+		DELETE FROM TB_IR_BOARD_FILE WHERE IR_BOARD_SEQ = #{ir_board_seq}
+	]]>
+	<if test="ir_board_file_seq != '' and ir_board_file_seq != null "><![CDATA[ AND IR_BOARD_FILE_SEQ = #{ir_board_file_seq} ]]></if>
+	</delete>
+	
+	<select id="select_ir_info" parameterType="ir" resultMap="ir_map">
+	<![CDATA[	
+        SELECT
+        	A.IR_BOARD_SEQ
+        	,A.IR_TYPE
+        	,A.TITLE
+        	,A.CONTENT
+        	,A.VIEW_START_DT
+        	,A.USE_YN
+            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS REG_TS
+            ,(SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_PROGRAM WHERE SITE_RESERV_MST_SEQ = A.SITE_RESERV_MST_SEQ) AS CNT            
+        	,B.SITE_RESERV_PROGRAM_SEQ 
+        	,B.DEPT_SEQ 
+        	,B.VIEW_START_DT
+        	,B.VIEW_END_DT
+        	,B.DATE_TIME
+        	,B.PROGRAM_NM
+        	,B.DATA_JSON 
+            ,CASE WHEN A.RESERVATION_TYPE = 'RT_SEMINAR' THEN (SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_SEMINAR_USER WHERE SITE_RESERV_PROGRAM_SEQ = B.SITE_RESERV_PROGRAM_SEQ)
+            	  WHEN A.RESERVATION_TYPE = 'RT_CAMP' THEN (SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_CAMP_USER WHERE SITE_RESERV_PROGRAM_SEQ = B.SITE_RESERV_PROGRAM_SEQ) 
+            END AS SUB_CNT
+ 		FROM GOJLS.TB_SITE_RESERV_MST A, GOJLS.TB_SITE_RESERV_PROGRAM B
+ 		WHERE A.USE_YN = 1
+ 		AND A.SITE_RESERV_MST_SEQ = B.SITE_RESERV_MST_SEQ
+ 		AND A.SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+		]]>
+	</select>
+		
+</mapper>

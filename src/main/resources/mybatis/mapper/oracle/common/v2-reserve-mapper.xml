@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+<mapper namespace="com.gojls.manage.common.dao.v2_ReserveDao">
+	
+	<resultMap id="reserve_mst_map" type="reserve_mst">
+		<result property="site_reserv_mst_seq" column="SITE_RESERV_MST_SEQ" />
+		<result property="reservation_type" column="RESERVATION_TYPE" />
+		<result property="reservation_month" column="RESERVATION_MONTH" />
+		<result property="view_start_dt" column="START_DT" />
+		<result property="view_end_dt" column="END_DT" />
+		<result property="reg_ts" column="REG_TS" />
+		<result property="cnt" column="CNT" />
+    	<collection property="reserve_program_list" column="SITE_RESERV_MST_SEQ" javaType="java.util.ArrayList" ofType="reserve_program_map" select="select_reserve_sub_program"/>
+		<!--
+		<collection property="reserve_program_list" ofType="reserve_program">
+			<id property="site_reserv_program_seq" column="SITE_RESERV_PROGRAM_SEQ" />
+			<result property="dept_seq" column="DEPT_SEQ" />
+			<result property="view_start_dt" column="SUB_START_DT" javaType="java.lang.String"/>
+			<result property="view_end_dt" column="SUB_END_DT" javaType="java.lang.String" />
+			<result property="date_time" column="DATE_TIME" />
+			<result property="program_nm" column="PROGRAM_NM" />
+			<result property="data_json" column="DATA_JSON" />
+			<result property="sub_cnt" column="SUB_CNT" />
+		</collection>
+		-->
+	</resultMap>	
+	
+	<resultMap id="reserve_program_map" type="reserve_program">
+		<result property="site_reserv_program_seq" column="SITE_RESERV_PROGRAM_SEQ" />
+		<result property="dept_seq" column="DEPT_SEQ" />
+		<result property="view_start_dt" column="VIEW_START_DT"/>
+		<result property="view_end_dt" column="VIEW_END_DT"/>
+		<result property="date_time" column="DATE_TIME" />
+		<result property="program_nm" column="PROGRAM_NM" />
+	</resultMap>
+	
+	<select id="select_reserve_info" parameterType="reserve_mst" resultMap="reserve_mst_map">	
+	<![CDATA[
+        SELECT
+        	A.SITE_RESERV_MST_SEQ AS SITE_RESERV_MST_SEQ
+        	,A.SITE_TYPE AS SITE_TYPE
+        	,A.RESERVATION_TYPE AS RESERVATION_TYPE
+        	,A.RESERVATION_MONTH AS RESERVATION_MONTH
+        	,A.VIEW_START_DT AS START_DT
+        	,A.VIEW_END_DT AS END_DT
+            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS REG_TS
+            ,(SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_PROGRAM WHERE SITE_RESERV_MST_SEQ = A.SITE_RESERV_MST_SEQ) AS CNT
+ 		FROM GOJLS.TB_SITE_RESERV_MST A
+ 		WHERE A.USE_YN = 1
+ 		AND A.SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+		]]>
+	<!--
+	<![CDATA[
+	SELECT * FROM (	
+        SELECT
+        	A.SITE_RESERV_MST_SEQ
+        	,A.SITE_TYPE
+        	,A.RESERVATION_TYPE
+        	,A.RESERVATION_MONTH
+        	,A.VIEW_START_DT
+        	,A.VIEW_END_DT
+            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS REG_TS
+            ,(SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_PROGRAM WHERE SITE_RESERV_MST_SEQ = A.SITE_RESERV_MST_SEQ) AS CNT            
+        	,B.SITE_RESERV_PROGRAM_SEQ 
+        	,B.DEPT_SEQ 
+        	,B.VIEW_START_DT AS SUB_START_DT
+        	,B.VIEW_END_DT AS SUB_END_DT
+        	,B.DATE_TIME
+        	,B.PROGRAM_NM
+        	,B.DATA_JSON 
+            ,CASE WHEN A.RESERVATION_TYPE = 'RT_SEMINAR' THEN (SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_SEMINAR_USER WHERE SITE_RESERV_PROGRAM_SEQ = B.SITE_RESERV_PROGRAM_SEQ)
+            	  WHEN A.RESERVATION_TYPE = 'RT_CAMP' THEN (SELECT COUNT(1) FROM GOJLS.TB_SITE_RESERV_CAMP_USER WHERE SITE_RESERV_PROGRAM_SEQ = B.SITE_RESERV_PROGRAM_SEQ) 
+            END AS SUB_CNT
+ 		FROM GOJLS.TB_SITE_RESERV_MST A, GOJLS.TB_SITE_RESERV_PROGRAM B
+ 		WHERE A.USE_YN = 1
+ 		AND A.SITE_RESERV_MST_SEQ = B.SITE_RESERV_MST_SEQ(+)
+ 		AND A.SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+ 	)
+		]]>
+	//-->	
+	</select>
+	
+	<select id="select_reserve_sub_program" resultMap="reserve_program_map">
+	<![CDATA[
+		SELECT         
+        	SITE_RESERV_PROGRAM_SEQ AS SITE_RESERV_PROGRAM_SEQ
+        	,DEPT_SEQ AS DEPT_SEQ 
+        	,VIEW_START_DT AS VIEW_START_DT
+        	,VIEW_END_DT AS VIEW_END_DT
+        	,DATE_TIME AS DATE_TIME
+        	,PROGRAM_NM AS PROGRAM_NM
+		FROM TB_SITE_RESERV_PROGRAM 
+		WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+	]]>
+	</select>
+	
+	<select id="select_reserve_list" parameterType="site_search" resultType="reserve_mst">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.reg_ts DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		        	A.SITE_RESERV_MST_SEQ AS site_reserv_mst_seq
+		        	,A.SITE_TYPE AS site_type
+		        	,A.RESERVATION_TYPE AS reservation_type
+		        	,A.LOCATION_TYPE AS location_type
+		        	,A.RESERVATION_MONTH AS reservation_month
+		        	,A.VIEW_START_DT AS view_start_dt
+		        	,A.VIEW_END_DT AS view_end_dt
+		        	,A.USE_YN AS user_yn
+		            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS reg_ts
+		        	,A.REG_USER_SEQ AS reg_user_seq
+		        	,A.REG_USER_ID AS reg_user_id
+		        	,A.REG_USER_NM AS reg_user_nm
+   		        FROM GOJLS.TB_SITE_RESERV_MST A
+		        WHERE A.USE_YN = 1
+				]]>
+				<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') >= #{search_start_dt} ]]></if>
+				<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') <= #{search_end_dt} ]]></if>
+				<if test="search_context != '' and search_context != null "><![CDATA[ AND A.REG_USER_NM LIKE '%'|| #{search_context} ||'%' ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{page_start_num} * #{page_size} ) AND B1.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY B1.rnum 	
+	]]>
+	</select>
+	
+	<insert id="insert_reserve_mst" parameterType="reserve_mst">
+		<selectKey keyProperty="site_reserv_mst_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.SITE_RESERV_MST_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_SITE_RESERV_MST(SITE_RESERV_MST_SEQ,SITE_TYPE,RESERVATION_TYPE,LOCATION_TYPE,RESERVATION_MONTH,VIEW_START_DT,VIEW_END_DT,USE_YN,REG_TS,REG_USER_SEQ,REG_USER_ID,REG_USER_NM)
+		VALUES(#{site_reserv_mst_seq}, #{site_type}, #{reservation_type}, #{location_type}, #{reservation_month}, #{view_start_dt}, #{view_end_dt}, 1, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert>
+		
+	<update id="update_reserve_mst" parameterType="reserve_mst">
+	<![CDATA[
+		UPDATE GOJLS.TB_SITE_RESERV_MST SET
+    		VIEW_START_DT=#{view_start_dt}, VIEW_END_DT=#{view_end_dt}, REG_USER_SEQ=#{reg_user_seq}, REG_USER_NM=#{reg_user_nm}, REG_USER_ID=#{reg_user_id}
+		WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_reserve_mst" parameterType="int">
+	<![CDATA[ DELETE FROM TB_SITE_RESERV_MST WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq} ]]>
+	</delete>
+		
+	<insert id="insert_reserve_program" parameterType="reserve_program">
+		<selectKey keyProperty="site_reserv_program_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.SITE_RESERV_PROGRAM_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_SITE_RESERV_PROGRAM(SITE_RESERV_PROGRAM_SEQ,SITE_RESERV_MST_SEQ,DEPT_SEQ,VIEW_START_DT, VIEW_END_DT, DATE_TIME,PROGRAM_NM,REG_TS,REG_USER_SEQ,REG_USER_ID,REG_USER_NM,DATA_JSON)
+		VALUES(#{site_reserv_program_seq} ,#{site_reserv_mst_seq}, #{dept_seq}, #{view_start_dt}, #{view_end_dt}, #{date_time}, #{program_nm}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm}, #{data_json})
+	]]>
+	</insert>
+		
+	<update id="update_reserve_program" parameterType="reserve_program">
+	<![CDATA[
+		UPDATE GOJLS.TB_SITE_RESERV_PROGRAM SET
+    		DEPT_SEQ=#{dept_seq},  VIEW_START_DT=#{view_start_dt}, VIEW_END_DT=#{view_end_dt}, DATE_TIME=#{date_time}, program_nm=#{program_nm}
+    		,REG_USER_SEQ=#{reg_user_seq}, REG_USER_NM=#{reg_user_nm}, REG_USER_ID=#{reg_user_id}, REG_TS=SYSTIMESTAMP 
+		WHERE SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_reserve_program" parameterType="reserve_program">
+	<![CDATA[ 
+		DELETE FROM TB_SITE_RESERV_PROGRAM WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+	]]>
+	<if test="site_reserv_program_seq != '' and site_reserv_program_seq != null "><![CDATA[ AND SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq} ]]></if>
+	</delete>
+
+	<delete id="delete_reserve_siminar_user" parameterType="reserve_seminar_us">
+	<![CDATA[ 
+		DELETE FROM GOJLS.TB_SITE_RESERV_SEMINAR_USER WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq} AND SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}
+	]]>
+	<if test="site_reserv_user_seq != '' and site_reserv_user_seq != null "><![CDATA[ AND SITE_RESERV_USER_SEQ = #{site_reserv_user_seq} ]]></if>
+	</delete>
+
+	<delete id="delete_reserve_camp_user" parameterType="reserve_camp_us">
+	<![CDATA[ 
+		DELETE FROM GOJLS.TB_SITE_RESERV_CAMP_USER WHERE SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq} AND SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}
+	]]>
+	<if test="site_reserv_user_seq != '' and site_reserv_user_seq != null "><![CDATA[ AND SITE_RESERV_USER_SEQ = #{site_reserv_user_seq} ]]></if>
+	</delete>
+	
+
+	<select id="select_reserve_seminar_user_list" parameterType="site_search" resultType="reserve_seminar_us">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.reg_ts DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		        	A.SITE_RESERV_USER_SEQ AS site_reserv_user_seq
+		        	,A.SITE_RESERV_MST_SEQ AS site_reserv_mst_seq
+		        	,A.SITE_RESERV_PROGRAM_SEQ AS site_reserv_program_seq
+		        	,A.SNAME AS sname
+		        	,A.PTYPE AS ptype
+		        	,A.PTYPE1 AS ptype1
+		        	,A.PTYPE2 AS ptype2
+		        	,A.GRADE AS grade
+		        	,A.DEPT_SEQ AS dept_seq
+		        	,A.PHONE AS phone
+		        	,A.EMAIL AS email
+		        	,A.PLACE AS place
+		        	,A.TEMP1 AS temp1
+		        	,A.TEMP2 AS temp2
+		        	,A.REGTYPE AS regtype
+		            , TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS reg_ts
+   		        FROM GOJLS.TB_SITE_RESERV_SEMINAR_USER A
+		        WHERE 1=1
+				]]>
+				<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') >= #{search_start_dt} ]]></if>
+				<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') <= #{search_end_dt} ]]></if>
+				<if test="search_context != '' and search_context != null "><![CDATA[ AND (A.SNAME LIKE '%'|| #{search_context} ||'%' OR A.PHONE LIKE '%'|| #{search_context} ||'%') ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{page_start_num} * #{page_size} ) AND B1.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY B1.rnum 	
+	]]>
+	</select>
+	
+	<insert id="insert_reserve_seminar_user" parameterType="reserve_seminar_us">
+		<selectKey keyProperty="site_reserv_user_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.SITE_RESERV_USER_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_SITE_RESERV_SEMINAR_USER(SITE_RESERV_USER_SEQ,SITE_RESERV_MST_SEQ,SITE_RESERV_PROGRAM_SEQ,SNAME,PTYPE,PTYPE1,PTYPE2,GRADE,DEPT_SEQ,PHONE,EMAIL,PLACE,TEMP1,TEMP2,REGTYPE,REG_TS)
+		VALUES(#{site_reserv_user_seq}, #{site_reserv_mst_seq}, #{site_reserv_program_seq}, #{sname}, #{ptype}, #{ptype1}, #{ptype2}, #{grade}, #{dept_seq}, #{phone}, #{email}, #{place}, #{temp1}, #{temp2}, #{regtype}, SYSTIMESTAMP)
+	]]>
+	</insert>	
+	
+	<select id="select_reserve_camp_user_list" parameterType="site_search" resultType="reserve_camp_us">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.reg_ts DESC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		        	A.SITE_RESERV_USER_SEQ AS site_reserv_user_seq
+		        	,A.SITE_RESERV_MST_SEQ AS site_reserv_mst_seq
+		        	,A.SITE_RESERV_PROGRAM_SEQ AS site_reserv_program_seq		        	
+		        	,A.NAME AS name
+		        	,A.ENAME AS ename
+		        	,A.SEX AS sex
+		        	,A.GRADE AS grade
+		        	,A.JLS_REG AS jls_reg
+		        	,A.DEPT_SEQ AS dept_seq
+		        	,A.P_LEVEL_ID AS p_level_id
+		        	,A.H_LEVEL_ID AS h_level_id
+		        	,A.PNAME AS pname		        	
+		        	,A.PHONE AS phone
+		        	,A.EMAIL AS email
+		        	,A.ADDRESS1 AS address1
+		        	,A.ADDRESS2 AS address2
+		        	,A.ZIPCODE AS zipcode
+		        	,A.T_SIZE AS t_size
+		        	,A.APP_TYPE AS app_type
+		        	,A.REGTYPE AS regtype
+		        	,A.BIRTH AS birth
+		        	,A.PBIRTH AS pbirth
+		        	,A.FNAME AS fname
+		        	,A.LNAME AS lname
+		        	,A.PENAME AS pename
+		        	,A.PNAME2 AS pname2
+		        	,A.PENAME2 AS pename2
+		        	,A.PHONE2 AS phone2
+		        	,A.PBIRTH2 AS pbirth2
+		            , TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS reg_ts
+   		        FROM GOJLS.TB_SITE_RESERV_CAMP_USER A
+		        WHERE 1=1
+				]]>
+				<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') >= #{search_start_dt} ]]></if>
+				<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') <= #{search_end_dt} ]]></if>
+				<if test="search_context != '' and search_context != null ">
+				<![CDATA[ AND (A.NAME LIKE '%'|| #{search_context} OR A.PNAME LIKE '%'||#{search_context}||'%' OR A.PNAME2 LIKE '%'||#{search_context}||'%' 
+				  		OR A.PHONE LIKE '%'|| #{search_context} ||'%' OR A.PHONE2 LIKE '%'|| #{search_context} ||'%')]]> 
+				</if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{page_start_num} * #{page_size} ) AND B1.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY B1.rnum 	
+	]]>
+	</select>
+	
+	<insert id="insert_reserve_camp_user" parameterType="reserve_camp_us">
+		<selectKey keyProperty="site_reserv_user_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.SITE_RESERV_USER_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_SITE_RESERV_CAMP_USER(SITE_RESERV_USER_SEQ,SITE_RESERV_MST_SEQ,SITE_RESERV_PROGRAM_SEQ,NAME,ENAME,SEX,GRADE,JLS_REG,DEPT_SEQ,P_LEVEL_ID,H_LEVEL_ID,PNAME,PHONE,EMAIL
+					,ADDRESS1,ADDRESS2,ZIPCODE,T_SIZE,APP_TYPE,REGTYPE,BIRTH,PBIRTH,FNAME,LNAME,PENAME,PNAME2,PENAME2,PHONE2,PBIRTH2,REG_TS)
+		VALUES(#{site_reserv_user_seq}, #{site_reserv_mst_seq}, #{site_reserv_program_seq}, #{name}, #{ename}, #{sex}, #{grade}, #{jls_reg}, #{dept_seq}, #{p_level_id}, #{h_level_id}, #{pname}, #{phone}
+				,#{email}, #{address1}, #{address2}, #{zipcode}, #{t_size}, #{app_type}, #{regtype}, #{birth}, #{pbirth}, #{fname}, #{lname}, #{pename}, #{pname2},#{pename2}, #{phone2}, #{pbirth2}, SYSTIMESTAMP)
+	]]>
+	</insert>
+	
+	<update id="update_reserve_camp_user" parameterType="reserve_camp_us">
+	<![CDATA[
+		UPDATE GOJLS.TB_SITE_RESERV_CAMP_USER SET
+    		SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}, NAME = #{name}, ENAME = #{ename},SEX = #{sex},GRADE = #{grade}, BIRTH = #{birth},JLS_REG = #{jls_reg},DEPT_SEQ = #{dept_seq}
+    		,PNAME = #{pname},PHONE = #{phone},EMAIL = #{email},T_SIZE = #{t_size},PBIRTH = #{pbirth}, MOD_TS=SYSTIMESTAMP
+		WHERE SITE_RESERV_USER_SEQ = #{site_reserv_user_seq}
+	]]>
+	</update>	
+	
+	<select id="cnt_reserve_program" parameterType="int" resultType="int">
+	<![CDATA[
+		SELECT
+			COUNT(1) AS cnt
+		FROM TB_SITE_RESERV_PROGRAM A, TB_SITE_RESERV_SEMINAR_USER B, TB_SITE_RESERV_CAMP_USER C
+		WHERE A.SITE_RESERV_PROGRAM_SEQ = B.SITE_RESERV_PROGRAM_SEQ
+    	AND A.SITE_RESERV_PROGRAM_SEQ = C.SITE_RESERV_PROGRAM_SEQ 
+		AND A.SITE_RESERV_MST_SEQ = #{site_reserv_mst_seq}
+	]]>
+	<if test="site_reserv_program_seq != '' and site_reserv_program_seq != null ">
+	<![CDATA[ AND A.SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq} ]]>
+	</if>
+	</select>
+	
+	<select id="cnt_reserve_program_user" parameterType="reserve_program" resultType="int">
+	<![CDATA[
+		SELECT COUNT(1) AS cnt		
+	]]>
+	<if test="reservation_type != '' and reservation_type == 'RT_SEMINAR' "><![CDATA[ FROM TB_SITE_RESERV_SEMINAR_USER ]]></if>
+	<if test="reservation_type != '' and reservation_type == 'RT_CAMP' "><![CDATA[ FROM TB_SITE_RESERV_CAMP_USER ]]></if>
+	<![CDATA[				
+		WHERE SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}
+	]]>
+	</select>	
+	
+	<select id="select_reserve_program" parameterType="int" resultType="reserve_program">
+	<![CDATA[
+		SELECT
+			A.SITE_RESERV_MST_SEQ AS site_reserv_mst_seq		        
+        	,B.SITE_RESERV_PROGRAM_SEQ AS site_reserv_program_seq
+        	,A.RESERVATION_TYPE AS reservation_type
+		FROM TB_SITE_RESERV_MST A, TB_SITE_RESERV_PROGRAM B, 
+		WHERE A.SITE_RESERV_MST_SEQ = B.SITE_RESERV_MST_SEQ				
+		AND A.SITE_RESERV_PROGRAM_SEQ = #{site_reserv_program_seq}
+	]]>
+	</select>
+		
+</mapper>

@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_AbroadPostDao">
+	<select id="select_site_post_tag" parameterType="site_search" resultType="site_tag"> 
+	<![CDATA[
+		SELECT
+		    A.SITE_TAG_SEQ AS site_tag_seq
+		    , A.TAG_NM AS tag_nm
+		    , A.ORDER_NUM AS order_num
+		    , A.VIEW_YN AS view_yn
+		    , (CASE WHEN A.MOD_TS IS NOT NULL THEN TO_CHAR(A.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(A.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+			, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_SEQ ELSE A.REG_USER_SEQ END ) AS reg_user_seq
+			, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_NM ELSE A.REG_USER_NM END ) AS reg_user_nm
+			, (SELECT COUNT(1) FROM TB_SITE_CONTENT_TAG B WHERE B.SITE_TAG_SEQ = A.SITE_TAG_SEQ) AS post_num
+		FROM TB_SITE_TAG A
+		WHERE A.SITE_TYPE = #{site_type}
+	]]>
+	<if test="search_context != '' and search_context != null "><![CDATA[ AND A.TAG_NM LIKE '%'|| #{search_context} ||'%' ]]></if>
+	<![CDATA[ ORDER BY (CASE WHEN A.ORDER_NUM = 0 THEN 99 ELSE A.ORDER_NUM END) ASC, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_TS ELSE A.REG_TS END) DESC ]]>
+	</select> 
+	
+	<insert id="insert_site_post_tag" parameterType="site_tag">
+	<![CDATA[
+		INSERT INTO TB_SITE_TAG(SITE_TAG_SEQ, SITE_TYPE, TAG_NM, ORDER_NUM, VIEW_YN, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM )
+		VALUES (SITE_TAG_SEQ.NEXTVAL, #{site_type}, #{tag_nm}, #{order_num}, #{view_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert>
+	
+	<update id="update_site_post_tag" parameterType="site_tag">
+	<![CDATA[
+		UPDATE TB_SITE_TAG SET 
+		    TAG_NM= #{tag_nm}, ORDER_NUM = #{order_num}, VIEW_YN = #{view_yn}, SITE_TYPE = #{site_type}
+		    , REG_TS = SYSTIMESTAMP, REG_USER_SEQ = #{reg_user_seq}, REG_USER_NM = #{reg_user_nm}, REG_USER_ID = #{reg_user_id}
+		WHERE SITE_TAG_SEQ = #{site_tag_seq}
+	]]>
+	</update>
+	
+	<update id="update_site_post_tag_sort" parameterType="site_tag">
+	<![CDATA[ UPDATE TB_SITE_TAG SET ORDER_NUM = null WHERE ORDER_NUM = #{order_num} AND SITE_TYPE = #{site_type} ]]>
+	</update>
+	
+	<select id="select_site_content_list" parameterType="site_search" resultType="site_content">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT
+				ROW_NUMBER() OVER (ORDER BY AA.reg_ts DESC) AS rnum
+	            , AA.site_content_seq
+	            , AA.title
+	            , AA.contents
+	            , AA.file_path
+	            , AA.thumbnail_path
+	            , AA.view_yn
+	            , AA.view_cnt
+	            , AA.reg_user_seq
+	            , AA.reg_user_nm
+	            , AA.tag_select_list
+	            , AA.tag_select_list_nm
+				, AA.reg_ts AS reg_ts
+			FROM (
+		        SELECT
+		            A.SITE_CONTENT_SEQ AS site_content_seq
+		            , A.TITLE AS title
+		            , A.CONTENTS AS contents
+		            , A.FILE_PATH AS file_path
+		            , A.THUMBNAIL_PATH AS thumbnail_path
+		            , A.VIEW_YN AS view_yn
+		            , A.VIEW_CNT AS view_cnt
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN TO_CHAR(A.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(A.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_SEQ ELSE A.REG_USER_SEQ END ) AS reg_user_seq
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_NM ELSE A.REG_USER_NM END ) AS reg_user_nm
+		            , (SELECT LISTAGG(B.SITE_TAG_SEQ,',') WITHIN GROUP (ORDER BY B.SITE_TAG_SEQ) FROM TB_SITE_CONTENT_TAG B WHERE B.SITE_CONTENT_SEQ = A.SITE_CONTENT_SEQ) AS tag_select_list
+		            , (SELECT LISTAGG(C.TAG_NM,',') WITHIN GROUP (ORDER BY C.TAG_NM) FROM TB_SITE_CONTENT_TAG B, TB_SITE_TAG C WHERE B.SITE_CONTENT_SEQ = A.SITE_CONTENT_SEQ AND B.SITE_TAG_SEQ = C.SITE_TAG_SEQ) AS tag_select_list_nm
+		        FROM TB_SITE_CONTENT A
+		        WHERE A.SITE_TYPE = #{site_type}
+		            AND A.CONTENT_TYPE = #{content_type}
+		    ) AA
+		    WHERE 1=1    
+			]]>		    
+			<if test="content_type == 'gallery' and tag_type != null and !tag_type.isEmpty ">
+			<![CDATA[ 
+			AND EXISTS ( 
+				SELECT SITE_CONTENT_SEQ FROM TB_SITE_CONTENT_TAG WHERE SITE_CONTENT_SEQ = AA.SITE_CONTENT_SEQ AND SITE_TAG_SEQ IN				
+			]]>
+	        <foreach collection="tag_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=INTEGER} </foreach>
+	        <![CDATA[
+			)
+			]]>
+	  		</if>
+			<if test="search_context != '' and search_context != null "><![CDATA[ AND AA.title LIKE '%'|| #{search_context} ||'%' ]]></if>
+			<![CDATA[
+		) BB
+		WHERE BB.rnum > ( #{page_start_num} * #{page_size} ) AND BB.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY BB.rnum 
+	]]>
+	</select>
+	
+	<insert id="insert_site_content" parameterType="site_content">
+		<selectKey resultType="int" keyProperty="site_content_seq" order="BEFORE">
+		SELECT SITE_CONTENT_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO TB_SITE_CONTENT(SITE_CONTENT_SEQ, SITE_TYPE, CONTENT_TYPE, TITLE, CONTENTS, FILE_PATH, THUMBNAIL_PATH, VIEW_YN, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, PREVIEW_TEXT)
+		VALUES (#{site_content_seq}, #{site_type}, #{content_type}, #{title}, #{contents}, #{file_path}, #{thumbnail_path}, #{view_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm}, #{preview_text})
+	]]>
+	</insert>
+	
+	<update id="update_site_content" parameterType="site_content">
+	<![CDATA[
+		UPDATE TB_SITE_CONTENT SET 
+		    TITLE = #{title} , CONTENTS = #{contents} , FILE_PATH = #{file_path}, THUMBNAIL_PATH = #{thumbnail_path} , VIEW_YN = #{view_yn}
+		    , PREVIEW_TEXT = #{preview_text}, MOD_TS = SYSTIMESTAMP , MOD_USER_SEQ = #{reg_user_seq} , MOD_USER_ID = #{reg_user_id}, MOD_USER_NM = #{reg_user_nm}
+		WHERE SITE_CONTENT_SEQ = #{site_content_seq}	
+	]]>
+	</update>
+	
+	<delete id="delete_site_content" parameterType="site_content">
+	<![CDATA[ DELETE FROM TB_SITE_CONTENT WHERE SITE_CONTENT_SEQ = #{site_content_seq} ]]>
+	</delete>
+	
+	<delete id="delete_site_content_tag" parameterType="site_content">
+	<![CDATA[ DELETE FROM TB_SITE_CONTENT_TAG WHERE SITE_CONTENT_SEQ = #{site_content_seq} ]]>
+	</delete>
+	
+	<insert id="insert_site_content_tag" parameterType="java.util.Map">
+		INSERT ALL 
+		<foreach collection="data" item="item" index="index">
+			INTO TB_SITE_CONTENT_TAG(SITE_CONTENT_SEQ, SITE_TAG_SEQ) VALUES (#{item.site_content_seq}, #{item.site_tag_seq})
+		</foreach>
+		SELECT * FROM DUAL
+	</insert>
+	
+	<select id="select_site_content_detail" parameterType="int" resultType="site_content">
+	<![CDATA[
+		SELECT  
+		    A.TITLE AS title
+		    , A.CONTENTS AS contents
+		    , A.FILE_PATH AS file_path
+		    , A.THUMBNAIL_PATH AS thumbnail_path
+		    , A.VIEW_YN AS view_yn
+		    , A.PREVIEW_TEXT AS preview_text
+		    , (SELECT LISTAGG(B.SITE_TAG_SEQ,',') WITHIN GROUP (ORDER BY B.SITE_TAG_SEQ) FROM TB_SITE_CONTENT_TAG B WHERE B.SITE_CONTENT_SEQ = A.SITE_CONTENT_SEQ) AS tag_select_list
+		FROM TB_SITE_CONTENT A
+		WHERE A.SITE_CONTENT_SEQ = #{site_content_seq}
+	]]>
+	</select>
+	
+	<!-- 1:1 counsel -->
+	<select id="select_site_counsel_list" parameterType="site_search" resultType="site_counsel">
+	<![CDATA[
+		SELECT 
+		    * 
+		FROM (
+		    SELECT
+				ROW_NUMBER() OVER (ORDER BY AA.reg_ts DESC) AS rnum
+				, AA.user_nm
+		        , AA.dept_nm
+		        , AA.dept_nm2
+		        , AA.reg_user_type
+		        , AA.reply_cnt
+		        , AA.contents
+		        , AA.read_yn
+		        , TO_CHAR(AA.reg_ts ,'YYYYMMDD') AS reg_ts
+		        , AA.reg_user_nm
+		        , AA.reply_no_read_cnt
+		        , AA.site_counsel_seq
+		        , AA.dept_seq
+		        , AA.user_seq
+		        , AA.site_counsel_reply_seq
+		    FROM (
+		        SELECT
+		            C.USER_NM AS user_nm
+		            , B.DEPT_NM AS dept_nm
+		    		, REPLACE(REPLACE(REPLACE(B.DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+		            , A.REG_USER_TYPE AS reg_user_type
+		            , A.REG_TS AS reg_ts
+		            , A.REPLY_CNT AS reply_cnt
+		            , D.CONTENTS AS contents
+		            , D.READ_YN AS read_yn
+		            , D.REG_USER_NM AS reg_user_nm
+		            , ( SELECT COUNT(1) FROM TB_SITE_COUNSEL_USER_REPLY E WHERE E.SITE_COUNSEL_SEQ = A.SITE_COUNSEL_SEQ AND E.QA_TYPE = 'A' AND E.USE_YN = 1 AND E.READ_YN = 0 ) AS reply_no_read_cnt
+		            , A.SITE_COUNSEL_SEQ AS site_counsel_seq
+		            , D.SITE_COUNSEL_REPLY_SEQ AS site_counsel_reply_seq
+		            , A.DEPT_SEQ AS dept_seq
+		            , A.USER_SEQ AS user_seq
+		         FROM TB_SITE_COUNSEL_USER A 
+		            , GAIMS.TB_DEPT B
+		            , GAIMS.TB_US_USER C
+		            , TB_SITE_COUNSEL_USER_REPLY D
+		         WHERE A.SITE_TYPE = #{site_type}
+		            AND A.DEPT_SEQ = B.DEPT_SEQ
+		            AND A.USER_SEQ = C.USER_SEQ
+		            AND A.USE_YN = 1
+		            AND A.SITE_COUNSEL_SEQ = D.SITE_COUNSEL_SEQ
+		            AND D.QA_TYPE = 'Q'
+		            AND D.USE_YN = 1
+		    ) AA 
+		    WHERE 1=1
+		    	AND AA.dept_seq IN ]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach>
+
+			<if test="search_context != '' and search_context != null ">
+				<![CDATA[ AND ( AA.contents LIKE '%'|| #{search_context} ||'%' OR AA.user_nm LIKE '%'|| #{search_context} ||'%' ) ]]>
+			</if>
+            <if test="search_start_dt != '' and search_start_dt != null">
+            	<![CDATA[ AND TO_CHAR(AA.reg_ts ,'YYYYMMDD') >= #{search_start_dt} AND TO_CHAR(AA.reg_ts ,'YYYYMMDD') <= #{search_end_dt} ]]>
+            </if>
+			<![CDATA[
+		) BB
+		WHERE BB.rnum > ( #{page_start_num} * #{page_size} ) AND BB.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY BB.rnum  
+	]]>
+	</select>
+	
+	<insert id="insert_site_counsel" parameterType="site_counsel">
+		<selectKey resultType="int" keyProperty="site_counsel_seq" order="BEFORE">
+		SELECT SITE_COUNSEL_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+	INSERT INTO TB_SITE_COUNSEL_USER ( SITE_COUNSEL_SEQ, SITE_TYPE, DEPT_SEQ, USER_SEQ, REG_USER_TYPE, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, USE_YN, REPLY_CNT ) 
+	VALUES ( #{site_counsel_seq}, #{site_type}, #{dept_seq}, #{user_seq}, #{reg_user_type}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm}, #{use_yn}, #{reply_cnt})
+	]]>
+	</insert>
+	
+	<insert id="insert_site_counsel_reply" parameterType="site_counsel">
+		<selectKey resultType="int" keyProperty="site_counsel_reply_seq" order="BEFORE">
+		SELECT SITE_COUNSEL_REPLY_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+	INSERT INTO TB_SITE_COUNSEL_USER_REPLY ( SITE_COUNSEL_REPLY_SEQ, SITE_COUNSEL_SEQ, REG_USER_TYPE, QA_TYPE, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, CONTENTS, USE_YN, READ_YN ) 
+	VALUES ( #{site_counsel_reply_seq}, #{site_counsel_seq}, #{reg_user_type}, #{qa_type}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm}, #{contents}, #{use_yn}, #{read_yn})
+	]]>
+	</insert>
+	
+	<update id="update_site_counsel_reply" parameterType="site_counsel">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_REPLY SET CONTENTS = #{contents} WHERE SITE_COUNSEL_REPLY_SEQ = #{site_counsel_reply_seq} ]]>
+	</update>
+	
+	<select id="select_site_counsel_view" parameterType="int" resultType="site_counsel">
+	<![CDATA[
+		SELECT 
+		    A.DEPT_SEQ AS dept_seq
+		    , A.USER_SEQ AS user_seq
+		    , B.REG_USER_NM AS reg_user_nm
+		    , ( CASE WHEN TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') = TO_CHAR(B.REG_TS,'YYYYMMDD') THEN '오늘'|| TO_CHAR(B.REG_TS,'hh24:mi') ELSE TO_CHAR(B.REG_TS,'YYYY.MM.DD') END) AS reg_ts
+		    , B.SITE_COUNSEL_REPLY_SEQ AS site_counsel_reply_seq
+		    , B.REG_USER_TYPE AS reg_user_type
+		    , B.QA_TYPE AS qa_type
+		    , B.CONTENTS AS contents
+		    , B.READ_YN AS read_yn
+		    , C.DEPT_NM AS dept_nm
+		    , REPLACE(REPLACE(REPLACE(C.DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+		    , D.USER_NM AS user_nm
+		    , (SELECT COUNT(1) FROM TB_SITE_COUNSEL_USER_FILE E WHERE E.SITE_COUNSEL_REPLY_SEQ = B.SITE_COUNSEL_REPLY_SEQ AND E.USE_YN = 1) AS counsel_file_cnt
+		FROM TB_SITE_COUNSEL_USER A
+		    , TB_SITE_COUNSEL_USER_REPLY B
+		    , GAIMS.TB_DEPT C
+		    , GAIMS.TB_US_USER D
+		WHERE A.SITE_COUNSEL_SEQ = #{site_counsel_seq}
+		    AND A.SITE_COUNSEL_SEQ = B.SITE_COUNSEL_SEQ
+		    AND B.USE_YN = 1
+		    AND A.DEPT_SEQ = C.DEPT_SEQ
+		    AND A.USER_SEQ = D.USER_SEQ
+		ORDER BY B.REG_TS ASC
+	]]>
+	</select>
+	
+	<select id="select_site_counsel_reply_file" parameterType="int" resultType="site_file">
+	<![CDATA[ SELECT FILE_NM AS file_nm, FILE_PATH AS file_path FROM TB_SITE_COUNSEL_USER_FILE WHERE SITE_COUNSEL_REPLY_SEQ = #{site_counsel_reply_seq} AND USE_YN = 1 ]]>
+	</select>
+	
+	<update id="update_site_counsel" parameterType="int">
+	<![CDATA[
+		UPDATE TB_SITE_COUNSEL_USER SET 
+		    REPLY_CNT = (SELECT COUNT(1) FROM TB_SITE_COUNSEL_USER_REPLY WHERE SITE_COUNSEL_SEQ = #{site_counsel_seq} AND USE_YN = 1 AND QA_TYPE='A')
+		    , LAST_REPLY_TS = SYSTIMESTAMP
+		WHERE SITE_COUNSEL_SEQ = #{site_counsel_seq}
+	]]> 
+	</update>
+	
+	<update id="update_site_counsel_cnt" parameterType="int">
+	<![CDATA[
+		UPDATE TB_SITE_COUNSEL_USER SET 
+		    REPLY_CNT = REPLY_CNT - 1
+		WHERE SITE_COUNSEL_SEQ = (SELECT SITE_COUNSEL_SEQ FROM TB_SITE_COUNSEL_USER_REPLY WHERE SITE_COUNSEL_REPLY_SEQ = #{site_counsel_reply_seq})
+	]]> 
+	</update>
+	
+	
+	<update id="delete_site_counsel_file" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_FILE SET USE_YN=0 WHERE SITE_COUNSEL_REPLY_SEQ IN (SELECT SITE_COUNSEL_REPLY_SEQ FROM TB_SITE_COUNSEL_USER_REPLY WHERE SITE_COUNSEL_SEQ = #{site_counsel_seq}) ]]> 
+	</update>
+
+	<update id="delete_site_counsel_reply" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_REPLY SET USE_YN=0 WHERE SITE_COUNSEL_SEQ = #{site_counsel_seq} ]]> 
+	</update>
+	
+	<update id="delete_site_counsel" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER SET USE_YN=0 WHERE SITE_COUNSEL_SEQ = #{site_counsel_seq} ]]> 
+	</update>
+
+	<update id="delete_site_counsel_file_p" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_FILE SET USE_YN=0 WHERE SITE_COUNSEL_REPLY_SEQ = #{site_counsel_reply_seq} ]]> 
+	</update>
+
+	<update id="delete_site_counsel_reply_p" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_REPLY SET USE_YN=0 WHERE SITE_COUNSEL_REPLY_SEQ = #{site_counsel_reply_seq} ]]> 
+	</update>
+	
+	<insert id="insert_site_counsel_file" parameterType="java.util.Map">
+		INSERT INTO TB_SITE_COUNSEL_USER_FILE (SITE_COUNSEL_FILE_SEQ, SITE_COUNSEL_REPLY_SEQ, FILE_NM, FILE_PATH, USE_YN)
+		SELECT SITE_COUNSEL_FILE_SEQ.NEXTVAL AS site_counsel_file_seq, A.* FROM (
+		<foreach collection="list" item="item" index="index" separator="union all">
+			SELECT #{item.site_counsel_reply_seq,jdbcType=INTEGER}, #{item.file_nm,jdbcType=VARCHAR}, #{item.file_path,jdbcType=VARCHAR}, 1 FROM DUAL
+		</foreach> 
+		) A
+	</insert>
+	
+	<update id="update_site_counsel_read_save" parameterType="int" >
+	<![CDATA[ UPDATE TB_SITE_COUNSEL_USER_REPLY SET READ_YN = 1 , READ_TS = SYSTIMESTAMP WHERE SITE_COUNSEL_SEQ = #{param_site_counsel_seq} AND REG_USER_TYPE='USER' AND READ_YN = 0 ]]>
+	</update>
+	
+	
+	<!-- 마이유학 > 리포트 -->
+	<select id="select_site_report_list" parameterType="site_search" resultType="site_report">
+	<![CDATA[
+		SELECT 
+		    * 
+		FROM (
+		    SELECT
+				ROW_NUMBER() OVER (ORDER BY AA.reg_ts DESC) AS rnum
+				, AA.user_nm
+		        , AA.dept_nm
+		        , AA.dept_nm2
+		        , AA.report_type
+		        , AA.title
+		        , TO_CHAR(AA.reg_ts ,'YYYYMMDD') AS reg_ts
+		        , AA.reg_user_nm
+		        , AA.site_report_user_seq
+		        , TO_CHAR(AA.read_ts ,'YYYYMMDD') AS read_ts
+		    FROM (
+		        SELECT
+		            C.USER_NM AS user_nm
+		            , B.DEPT_NM AS dept_nm
+		    		, REPLACE(REPLACE(REPLACE(B.DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+		            , A.REPORT_TYPE AS report_type
+		            , A.TITLE AS title
+		            , A.REG_TS AS reg_ts
+		            , A.REG_USER_NM AS reg_user_nm
+		            , A.SITE_REPORT_USER_SEQ AS site_report_user_seq
+		            , A.DEPT_SEQ AS dept_seq
+		            , A.READ_TS AS read_ts
+		         FROM TB_SITE_REPORT_USER A
+		            , GAIMS.TB_DEPT B
+		            , GAIMS.TB_US_USER C
+		         WHERE A.SITE_TYPE = #{site_type}
+		            AND A.DEPT_SEQ = B.DEPT_SEQ
+		            AND A.USER_SEQ = C.USER_SEQ
+		            AND A.USE_YN = 1
+		    ) AA
+		    WHERE 1=1
+		    	AND AA.report_type IN ]]><foreach item="report_type" index="index" collection="content_type_arr" open="(" separator="," close=")">#{report_type,jdbcType=VARCHAR}</foreach><![CDATA[
+		    	AND AA.dept_seq IN ]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach>
+
+			<if test="search_context != '' and search_context != null ">
+				<![CDATA[ AND ( AA.title LIKE '%'|| #{search_context} ||'%' OR AA.user_nm LIKE '%'|| #{search_context} ||'%' ) ]]>
+			</if>
+            <if test="search_start_dt != '' and search_start_dt != null">
+            	<![CDATA[ AND TO_CHAR(AA.reg_ts ,'YYYYMMDD') >= #{search_start_dt} AND TO_CHAR(AA.reg_ts ,'YYYYMMDD') <= #{search_end_dt} ]]>
+            </if>
+			<![CDATA[
+		) BB
+		WHERE BB.rnum > ( #{page_start_num} * #{page_size} ) AND BB.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY BB.rnum  	
+		]]>
+	</select>
+	
+	<insert id="insert_site_report" parameterType="site_report">
+		<selectKey resultType="int" keyProperty="site_report_user_seq" order="BEFORE">
+		SELECT SITE_REPORT_USER_SEQ.NEXTVAL FROM DUAL 
+		</selectKey>
+	<![CDATA[
+	INSERT INTO TB_SITE_REPORT_USER(SITE_REPORT_USER_SEQ, SITE_TYPE, REPORT_TYPE, DEPT_SEQ, USER_SEQ, TITLE, CONTENTS, USE_YN, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+	VALUES (#{site_report_user_seq}, #{site_type}, #{report_type}, #{dept_seq}, #{user_seq}, #{title}, #{contents}, #{use_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert>
+	
+	<update id="update_site_report" parameterType="site_report">
+	<![CDATA[ UPDATE TB_SITE_REPORT_USER SET REPORT_TYPE = #{report_type}, TITLE = #{title}, CONTENTS = #{contents} WHERE SITE_REPORT_USER_SEQ = #{site_report_user_seq} ]]> 
+	</update> 
+	
+	<delete id="delete_site_report_file" parameterType="int">
+	<![CDATA[ DELETE FROM TB_SITE_REPORT_FILE WHERE SITE_REPORT_USER_SEQ = #{site_report_user_seq} ]]>
+	</delete> 
+	
+	<insert id="insert_site_report_file" parameterType="java.util.Map">
+		INSERT INTO TB_SITE_REPORT_FILE (SITE_REPORT_FILE_SEQ, SITE_REPORT_USER_SEQ, FILE_NM, FILE_PATH, USE_YN)
+		SELECT SITE_REPORT_FILE_SEQ.NEXTVAL AS site_report_file_seq, A.* FROM (
+		<foreach collection="list" item="item" index="index" separator="union all">
+			SELECT #{item.site_report_user_seq,jdbcType=INTEGER}, #{item.file_nm,jdbcType=VARCHAR}, #{item.file_path,jdbcType=VARCHAR}, 1 FROM DUAL
+		</foreach> 
+		) A
+	</insert>
+	
+	<update id="del_site_report_file" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_REPORT_FILE SET USE_YN = 0 WHERE SITE_REPORT_USER_SEQ = #{site_report_user_seq} ]]> 
+	</update>
+	
+	<update id="delete_site_report" parameterType="int">
+	<![CDATA[ UPDATE TB_SITE_REPORT_USER SET USE_YN = 0 WHERE SITE_REPORT_USER_SEQ = #{site_report_user_seq} ]]> 
+	</update>
+	
+	<select id="select_site_report_view" parameterType="int" resultType="site_report">
+	<![CDATA[
+		SELECT 
+		    A.DEPT_SEQ AS dept_seq 
+		    , A.USER_SEQ AS user_seq 
+		    , B.DEPT_NM  AS dept_nm 
+		    , REPLACE(REPLACE(REPLACE(B.DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+		    , C.USER_NM AS user_nm
+		    , A.REG_USER_NM AS reg_user_nm
+		    , A.REG_TS AS reg_ts
+		    , A.SITE_REPORT_USER_SEQ AS site_report_user_seq
+		    , A.REPORT_TYPE AS report_type
+		    , A.CONTENTS AS contents
+		    , D.FILE_PATH AS param_file_path
+		    , D.FILE_NM AS param_file_nm 
+		    , A.TITLE AS title
+		FROM TB_SITE_REPORT_USER A
+		    , GAIMS.TB_DEPT B
+		    , GAIMS.TB_US_USER C
+		    , TB_SITE_REPORT_FILE D
+		WHERE A.SITE_REPORT_USER_SEQ = #{site_report_user_seq}
+		    AND A.DEPT_SEQ = B.DEPT_SEQ
+		    AND A.USER_SEQ = C.USER_SEQ
+		    AND A.SITE_REPORT_USER_SEQ = D.SITE_REPORT_USER_SEQ(+)
+	]]> 
+	</select> 
+</mapper>

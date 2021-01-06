@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.DeptDao">
+	<select id="selectDeptTopList" resultType="dept">
+	<![CDATA[ SELECT E.DEPT_SEQ AS dltDeptSeq, E.DEPT_NM AS dltDeptNm FROM TB_DEPT E WHERE E.PARENT_DEPT_SEQ = 1 AND (E.GT_DEPT_TYPE IS NOT NULL AND E.GT_DEPT_TYPE NOT IN ('DP3000')) ]]>
+	</select>
+	
+	<select id="selectDeptSecList" parameterType="int" resultType="dept">
+	<![CDATA[ 
+		SELECT 
+			D.DELEGATE_WEB_DEPT_SEQ AS dltDeptSeq
+			, D.DELEGATE_WEB_NAME AS dltDeptNm 
+		FROM GAIMS.TB_DEPT D
+		WHERE D.DELEGATE_WEB_YN = 1 
+			AND D.PARENT_DEPT_SEQ IN (SELECT E.DEPT_SEQ FROM TB_DEPT E WHERE E.PARENT_DEPT_SEQ = #{parentDeptSeq} ) ORDER BY D.DELEGATE_WEB_NAME 
+	]]>
+	</select>
+
+	<select id="selectDeptList" resultType="dept">
+	<![CDATA[ SELECT D.DELEGATE_WEB_DEPT_SEQ AS dltDeptSeq, D.DELEGATE_WEB_NAME AS dltDeptNm FROM GAIMS.TB_DEPT D WHERE D.DELEGATE_WEB_YN = 1 ORDER BY D.DELEGATE_WEB_NAME ]]>
+	</select>
+</mapper>

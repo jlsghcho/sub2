@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_BannerDao">
+	<select id="select_banner_list" parameterType="sch" resultType="banner">
+	<![CDATA[
+	SELECT * FROM (
+		SELECT
+			ROW_NUMBER() OVER (ORDER BY B.order_reg_ts DESC) AS rnum
+			, B.* 
+		FROM (
+			SELECT
+				A.BANNER_SEQ AS banner_seq
+				, A.GT_BANNER_LOCATION AS gt_banner_loc
+				, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_LOCATION) AS gt_banner_loc_nm
+				, A.GT_BANNER_TYPE AS gt_banner_type
+				, GAIMS.COMMON_PKG.CODE_NM(A.GT_BANNER_TYPE) AS gt_banner_type_nm
+				, SUBSTR(A.GT_BANNER_TYPE, -1) AS banner_sort
+				, A.DEPT_SEQ AS dept_seq
+				, (
+                    CASE 
+                        WHEN A.DEPT_SEQ = 150 THEN '유학센터'
+                        WHEN A.DEPT_SEQ = 120 OR A.DEPT_SEQ = 130 THEN (SELECT B.DEPT_NM FROM GAIMS.TB_DEPT B WHERE B.DEPT_SEQ = A.DEPT_SEQ)
+                        ELSE (SELECT NVL((SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ = B.DELEGATE_WEB_DEPT_SEQ), B.DEPT_NM) FROM GAIMS.TB_DEPT B WHERE B.DEPT_SEQ = A.DEPT_SEQ) END
+                )AS dept_nm				
+				, A.TITLE AS title
+				, (CASE WHEN A.MOD_TS IS NOT NULL THEN TO_CHAR(A.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(A.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+				, A.REG_TS AS order_reg_ts				
+				, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_SEQ ELSE A.REG_USER_SEQ END ) AS reg_user_seq
+				, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_NM ELSE A.REG_USER_NM END ) AS reg_user_nm
+				, A.BANNER_IMG_PATH AS banner_img_path
+				, A.VIEW_START_DT AS start_dt
+				, A.VIEW_END_DT AS end_dt
+				, A.LINK_URL AS link_url
+				, A.LINK_TARGET_FL AS link_target_fl
+				, A.USE_YN AS use_yn
+				, (
+					CASE 
+						WHEN TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') >= VIEW_START_DT AND TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') <= VIEW_END_DT THEN 1
+						WHEN TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') < VIEW_START_DT THEN 2
+						WHEN TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') > VIEW_END_DT THEN 99
+					END
+				) AS use_status
+				, A.MOBI_BANNER_IMG_PATH AS mobi_banner_img_path
+			FROM GOJLS.TB_BANNER A
+			WHERE A.GT_BANNER_LOCATION NOT IN ('BN1003')
+				AND A.USE_YN = 1
+		) B
+		WHERE
+			1=1 
+			AND B.gt_banner_loc IN 
+		]]>
+        <foreach collection="search_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+        <![CDATA[
+        	AND B.use_status IN
+        ]]>
+        <foreach collection="search_status" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=INTEGER} </foreach>
+        
+        <choose>
+        	<when test="search_dept_arr != null">
+        		<![CDATA[ AND B.dept_seq IN ]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach>
+        	</when>
+        	<otherwise>
+				<if test="search_dept != '' and search_dept != null ">
+					<if test="search_dept == '120' or search_dept == '130' or search_dept == '150'">
+					<![CDATA[ 
+						AND (
+							B.dept_seq IN ( 
+								SELECT E.DEPT_SEQ 
+								FROM GAIMS.TB_DEPT E 
+								WHERE E.PARENT_DEPT_SEQ IN (
+									SELECT D.DEPT_SEQ 
+									FROM GAIMS.TB_DEPT D 
+									WHERE D.PARENT_DEPT_SEQ = #{search_dept}
+								)
+							) 
+							OR (B.dept_seq = #{search_dept})
+						)
+					]]>
+					</if>
+					<if test="search_dept != '120' and search_dept != '130' and search_dept != '150'">
+					<![CDATA[ 
+						AND (
+							B.dept_seq IN (
+								SELECT E.PARENT_DEPT_SEQ 
+								FROM GAIMS.TB_DEPT E 
+								WHERE E.DEPT_SEQ IN (
+									SELECT D.PARENT_DEPT_SEQ 
+									FROM GAIMS.TB_DEPT D 
+									WHERE D.DEPT_SEQ = #{search_dept}
+								)
+							)
+							OR (B.dept_seq = #{search_dept}) 
+						)
+					]]>
+					</if>
+				</if>
+        	</otherwise>
+        </choose>
+        
+		<if test="search_context != '' and search_context != null "><![CDATA[ AND B.title LIKE '%'|| #{search_context} ||'%' ]]></if>
+		<![CDATA[
+	) C
+	WHERE C.rnum > ( #{page_start_num} * #{page_size} ) AND C.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+	]]>
+	</select>
+	
+	<insert id="insert_banner_save" parameterType="banner">
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BANNER 
+		    (BANNER_SEQ, GT_BANNER_LOCATION, GT_BANNER_TYPE, DEPT_SEQ, TITLE, REG_TS, REG_USER_SEQ, REG_USER_NM, BANNER_IMG_PATH, VIEW_START_DT, VIEW_END_DT, USE_YN, LINK_URL, LINK_TARGET_FL, MOBI_BANNER_IMG_PATH)
+		VALUES
+		    (BANNER_SEQ.NEXTVAL, #{gt_banner_loc}, #{gt_banner_type}, #{dept_seq}, #{title}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm}, #{banner_img_path}, #{start_dt}, #{end_dt}, 1, #{link_url}, #{link_target_fl}, #{mobi_banner_img_path})
+	]]>
+	</insert>
+	
+	<update id="update_banner_save" parameterType="banner">
+	<![CDATA[
+		UPDATE GOJLS.TB_BANNER SET
+		    TITLE = #{title}, BANNER_IMG_PATH = #{banner_img_path}, VIEW_START_DT=#{start_dt}, VIEW_END_DT=#{end_dt}
+		    , LINK_URL = #{link_url}, LINK_TARGET_FL=#{link_target_fl}, MOD_TS=SYSTIMESTAMP, MOD_USER_SEQ = #{reg_user_seq}, MOD_USER_NM=#{reg_user_nm}
+		    , MOBI_BANNER_IMG_PATH = #{mobi_banner_img_path}, GT_BANNER_TYPE = #{gt_banner_type}
+		WHERE BANNER_SEQ = #{banner_seq}	
+	]]>
+	</update>
+	
+	<select id="select_banner_overlap_check" parameterType="banner" resultType="integer">
+	<![CDATA[
+		SELECT COUNT(1) FROM GOJLS.TB_BANNER 
+        WHERE DEPT_SEQ = #{dept_seq} 
+            AND USE_YN = 1
+            AND GT_BANNER_LOCATION = #{gt_banner_loc}
+            AND GT_BANNER_TYPE = #{gt_banner_type}
+            AND ((#{start_dt} >= VIEW_START_DT AND #{start_dt} <= VIEW_END_DT) OR (#{end_dt} >= VIEW_START_DT AND #{end_dt} <= VIEW_END_DT))
+	]]>
+	<if test="banner_seq != '' and banner_seq != null "><![CDATA[ AND BANNER_SEQ NOT IN (#{banner_seq}) ]]></if>
+	</select>
+	
+	<update id="delete_banner_save" parameterType="banner">
+	<![CDATA[ UPDATE GOJLS.TB_BANNER SET VIEW_START_DT=TO_CHAR(SYSTIMESTAMP-1,'YYYYMMDD'), VIEW_END_DT=TO_CHAR(SYSTIMESTAMP-1,'YYYYMMDD'), USE_YN=0 WHERE BANNER_SEQ = #{banner_seq} ]]>
+	</update>
+</mapper>

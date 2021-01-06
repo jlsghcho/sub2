@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.UnioneDao">
+	<select id="selectUnioneSyncList" parameterType="search" resultType="dept">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.deptNm ASC, A1.deptSeq ASC ) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		            A.DEPT_SEQ AS deptSeq
+				    , A.DEPT_NM AS deptNm
+				  	, A.DEPT_NM_MOBILE AS deptMobileNm
+				    , A.BOSS_NM AS bossNm
+				    , A.TEL1 AS tel
+				    , A.DEPT_DESCS_MOBILE AS deptDescsMobile
+				    , A.ZIPCODE AS zipCode
+				    , B.CORP_NM AS corpNm
+				    , B.STATUS AS status
+		        FROM GAIMS.TB_DEPT A LEFT OUTER JOIN TB_BRANCH_DEPT_API B ON A.DEPT_SEQ = B.DEPT_SEQ
+		        WHERE A.USE_YN = 1
+		    		AND A.GT_WEB_OPEN = 'DP1001' 
+				]]>
+				<if test="searchCourse != '' and searchCourse != null "><![CDATA[ AND A.GT_DEPT_COURSE = #{searchCourse} ]]></if>
+				<if test="searchDeptSeq != '' and searchDeptSeq != null "><![CDATA[ AND  A.DEPT_SEQ = #{searchDeptSeq} ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{jtStartIndex} ) AND B1.rnum <= ( #{jtStartIndex} + #{jtPageSize} )	
+	]]>
+	</select>
+
+	<select id="selectUnioneSyncListCnt" parameterType="search" resultType="integer">
+	<![CDATA[
+        SELECT 
+			COUNT(1)
+		FROM GAIMS.TB_DEPT A
+		WHERE A.USE_YN = 1
+		    AND A.GT_WEB_OPEN = 'DP1001' 
+		]]>
+		<if test="searchCourse != '' and searchCourse != null "><![CDATA[ AND A.GT_DEPT_COURSE = #{searchCourse} ]]></if>
+		<if test="searchDeptSeq != '' and searchDeptSeq != null "><![CDATA[ AND  A.DEPT_SEQ = #{searchDeptSeq} ]]></if>
+	</select>
+	
+	<select id="selectCourseCode" resultType="dept">
+	<![CDATA[
+		SELECT 
+			COMMON_CODE AS  courseSeq
+			, KOR_CODE_NAME AS courseNm
+		FROM GAIMS.GT_CODE 
+		WHERE COMMON_CODE IN ('DP2001','DP2002','DP2003','DP2007')
+		ORDER BY SORT_SEQUENCE
+	]]>
+	</select>
+	
+	<select id="selectDeptCode" parameterType="String" resultType="dept">
+	<![CDATA[
+		SELECT 
+			DEPT_SEQ AS deptSeq
+			, DEPT_NM AS deptNm
+		FROM GAIMS.TB_DEPT 
+		WHERE GT_WEB_OPEN = 'DP1001'
+			AND GT_DEPT_COURSE = #{courseSeq}
+		ORDER BY DEPT_NM
+	]]>
+	</select>
+	
+	<select id="selectDeptList" parameterType="unionedept" resultType="unionedept">
+	<![CDATA[
+		WITH DEPT_TMP AS (
+		SELECT 
+			D.DEPT_SEQ AS organizationNo
+			, DC.DEPT_NM_MOBILE AS name
+			, DC.BOSS_NM AS ownerName
+			, DC.DEPT_DESCS_MOBILE AS description
+			, DC.TEL1 AS phoneNumber
+			, DC.ZIPCODE AS postCode
+			, DC,ADDR1 || ' ' || DC.ADDR2 AS address
+			, (#{gojlsurl} ||'?'|| D.DEPT_SEQ) AS url
+			, ROW_NUMBER() OVER(PARTITION BY D.DEPT_SEQ ORDER BY DC.DEPT_CONTACT_SEQ) AS RN
+		FROM GAIMS.TB_DEPT D, GAIMS.TB_DEPT_CONTACT DC
+		WHERE D.DEPT_SEQ = DC.DEPT_SEQ AND 
+			D.DEPT_SEQ IN 
+		]]>
+		<foreach collection="deptlist" item="deptSeq" separator="," open="(" close=")">
+			#{deptSeq}
+		</foreach>
+		<![CDATA[
+		)
+		SELECT * FROM DEPT_TMP
+		WHERE RN = 1
+		]]>
+	</select>
+	
+	<insert id="insertScheduleLog" parameterType="schLog">
+	<![CDATA[
+		INSERT INTO JLSAPI.TB_API_SCHEDULE_LOG(API_SCHEDULE_SEQ, PARTNER_NM, EVENT_CODE, EVENT_SUB_CODE, TRAN_TYPE, TRAN_SEQ, TRAN_RESULT, TRAN_MSG, REG_TS )
+		VALUES(JLSAPI.API_SCHEDULE_SEQ.NEXTVAL, #{partnerNm}, #{eventCode}, #{eventSubCode}, #{tranType}, #{tranSeq}, #{tranResult},#{tranMsg}, SYSTIMESTAMP )
+	]]>
+	</insert>
+	
+	<insert id="margeDeptApi" parameterType="unionedept">
+	<![CDATA[
+		MERGE INTO GOJLS.TB_BRANCH_DEPT_API
+		USING DUAL
+		ON (DEPT_SEQ = #{deptSeq})
+		WHEN MATCHED THEN 
+			UPDATE SET
+				STATUS = #{status}
+				, MOD_USER_SEQ = #{regUserSeq}
+				, MOD_USER_ID = #{regUserId}
+				, MOD_USER_NM = #{regUserNm}
+		WHEN NOT MATCHED THEN 
+			INSERT (DEPT_SEQ, CORP_NM, STATUS, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+			VALUES (#{deptSeq}, #{corpNm}, #{status}, sysdate, #{regUserSeq}, #{regUserId}, #{regUserNm})
+	]]>
+	</insert>
+</mapper>

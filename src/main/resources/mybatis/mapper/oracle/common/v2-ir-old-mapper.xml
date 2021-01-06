@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_IR_OLD_Dao">
+	
+	<resultMap id="ir_map" type="ir">
+		<id property="ir_board_seq" column="BOARD_SEQ_BROADCAST" />
+		<result property="ir_type" column="IPR_TYPE" />
+		<result property="title" column="TITLE" />
+		<result property="editor_txt" column="CONTENT" />
+		<result property="view_start_dt" column="VIEW_START_DT" />
+		<result property="view_cnt" column="VIEW_CNT" />
+		<result property="use_yn" column="USE_YN" />
+		<result property="reg_user_seq" column="REG_USER_SEQ" />
+		<result property="reg_user_nm" column="REG_USER_NM" />
+		<result property="reg_ts" column="REG_TS" />
+		<result property="cnt" column="CNT" />
+		<collection property="file_list" ofType="ir_file">
+			<id property="ir_board_file_seq" column="IR_BOARD_FILE_SEQ" />
+			<result property="file_nm" column="FILE_NM" />
+			<result property="file_path" column="FILE_PATH" />
+		</collection>
+	</resultMap>
+	
+	<select id="select_ir_list" parameterType="site_search" resultMap="ir_map">
+	<![CDATA[
+		SELECT B1.BOARD_SEQ_BROADCAST
+	        	,B1.IPR_TYPE
+	        	,B1.TITLE
+	        	,B1.VIEW_START_DT
+	        	,B1.VIEW_CNT
+	        	,B1.USE_YN
+		        ,TO_CHAR(B1.REG_TS, 'YYYY.MM.DD') AS REG_TS    
+	        	,B1.REG_USER_SEQ
+	        	,B1.REG_USER_NM 
+           		,B1.CNT           
+           		,TO_CHAR(B1.ORG_REG_TS, 'YYYYMMDD') AS ORG_REG_TS    
+		FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.reg_ts DESC) AS rnum
+		        , A1.*
+		    FROM (
+		    
+		        SELECT  
+		        	A.BOARD_SEQ_BROADCAST
+		        	,A.IPR_TYPE
+		        	,A.TITLE
+		        	,A.VIEW_START_DT
+		        	,A.VIEW_CNT
+		        	,A.USE_YN
+		            ,A.REG_TS
+		            ,A.REG_TS AS ORG_REG_TS     
+		        	,A.REG_USER_SEQ
+		        	,A.REG_USER_NM 
+		        	,(SELECT COUNT(IR_BOARD_FILE_SEQ) FROM TB_IR_BOARD_FILE WHERE IR_BOARD_SEQ = A.BOARD_SEQ_BROADCAST) AS CNT       
+		        	,(SELECT IR_BOARD_FILE_SEQ FROM TB_IR_BOARD_FILE WHERE IR_BOARD_SEQ = A.BOARD_SEQ_BROADCAST AND ROWNUM = 1) AS IR_BOARD_FILE_SEQ                
+   		        FROM GOJLS.WB_BD_BROADCAST A
+ 				WHERE A.IPR_TYPE IN 
+			]]>
+	        	<foreach collection="search_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+				<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') >= #{search_start_dt} ]]></if>
+				<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYYMMDD') <= #{search_end_dt} ]]></if>
+				<if test="search_context != '' and search_context != null "><![CDATA[ AND ( A.REG_USER_NM LIKE '%'|| #{search_context} ||'%' OR A.TITLE LIKE '%'|| #{search_context} ||'%' )]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{page_start_num} * #{page_size} ) AND B1.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY B1.rnum 	
+	]]>
+	</select>
+	
+	<insert id="insert_ir_board" parameterType="ir">
+		<selectKey keyProperty="ir_board_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BOARD_SEQ_BROADCAST.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.WB_BD_BROADCAST(BOARD_SEQ_BROADCAST,IPR_TYPE,TITLE,CONTENT,VIEW_START_DT,VIEW_CNT,USE_YN,REG_TS,REG_USER_SEQ,REG_USER_NM)
+		VALUES(#{ir_board_seq}, #{ir_type}, #{title}, #{editor_txt}, #{view_start_dt}, 0, #{use_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm})
+	]]>
+	</insert>
+		
+	<update id="update_ir_board" parameterType="ir">
+	<![CDATA[
+		UPDATE GOJLS.WB_BD_BROADCAST SET
+    		TITLE=#{title}, CONTENT=#{editor_txt}, USE_YN=#{use_yn}, VIEW_START_DT=#{view_start_dt}, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_NM=#{reg_user_nm}
+		WHERE BOARD_SEQ_BROADCAST = #{ir_board_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_ir_board" parameterType="int">
+	<![CDATA[ DELETE FROM WB_BD_BROADCAST WHERE BOARD_SEQ_BROADCAST = #{ir_board_seq} ]]>
+	</delete>
+		
+	<insert id="insert_ir_board_file" parameterType="ir_file">
+		<selectKey keyProperty="ir_board_file_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.IR_BOARD_FILE_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_IR_BOARD_FILE(IR_BOARD_FILE_SEQ,IR_BOARD_SEQ,FILE_NM,FILE_PATH,USE_YN)
+		VALUES(#{ir_board_file_seq} ,#{ir_board_seq}, #{file_nm}, #{file_path}, 1)
+	]]>
+	</insert>
+		
+	<update id="update_ir_board_file" parameterType="ir_file">
+	<![CDATA[
+		UPDATE GOJLS.TB_IR_BOARD_FILE SET
+    		FILE_NM=#{file_nm}, FILE_PATH=#{file_path}
+		WHERE IR_BOARD_FILE_SEQ = #{ir_board_file_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_ir_board_file" parameterType="ir_file">
+	<![CDATA[ 
+		DELETE FROM TB_IR_BOARD_FILE 
+	]]>
+	<if test="ir_board_seq > 0 and ir_board_seq != '' and ir_board_seq != null "><![CDATA[ WHERE IR_BOARD_SEQ = #{ir_board_seq} ]]></if>
+	<if test="ir_board_file_seq > 0 and ir_board_file_seq != '' and ir_board_file_seq != null "><![CDATA[ WHERE IR_BOARD_FILE_SEQ = #{ir_board_file_seq} ]]></if>
+	<if test="ir_board_seq > 0 and ir_board_file_seq > 0"><![CDATA[ WHERE IR_BOARD_SEQ = #{ir_board_seq} AND IR_BOARD_FILE_SEQ = #{ir_board_file_seq} ]]></if>
+	</delete>
+	
+	<select id="select_ir_view" parameterType="ir" resultMap="ir_map">
+	<![CDATA[	
+        SELECT
+        	A.BOARD_SEQ_BROADCAST
+        	,A.IPR_TYPE
+        	,A.TITLE
+        	,A.CONTENT
+        	,A.VIEW_START_DT
+        	,A.VIEW_CNT
+        	,A.USE_YN
+            ,TO_CHAR(A.REG_TS, 'YYYY.MM.DD') AS REG_TS            
+        	,B.IR_BOARD_FILE_SEQ
+        	,B.FILE_NM
+        	,B.FILE_PATH
+ 		FROM GOJLS.WB_BD_BROADCAST A, GOJLS.TB_IR_BOARD_FILE B
+ 		WHERE A.BOARD_SEQ_BROADCAST = B.IR_BOARD_SEQ(+)
+ 		AND A.BOARD_SEQ_BROADCAST = #{ir_board_seq}
+		]]>
+	</select>
+		
+		
+	<select id="select_ir_file_list" parameterType="int" resultType="ir_file">
+	<![CDATA[	
+        SELECT       
+        	IR_BOARD_FILE_SEQ AS ir_board_file_seq
+        	,FILE_NM AS file_nm
+        	,FILE_PATH AS file_path
+ 		FROM GOJLS.TB_IR_BOARD_FILE 
+ 		WHERE IR_BOARD_SEQ = #{ir_board_seq}
+		]]>
+	</select>
+		
+		
+</mapper>

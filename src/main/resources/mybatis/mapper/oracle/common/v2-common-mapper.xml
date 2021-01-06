@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_CommonDao">
+	<select id="select_dept_top_list" parameterType="branch" resultType="branch">
+	<![CDATA[ 
+		SELECT * FROM (
+		    SELECT 
+		        E.DEPT_SEQ AS dlt_dept_seq
+		        , E.DEPT_NM AS dlt_dept_nm
+		    FROM TB_DEPT E 
+		    WHERE E.PARENT_DEPT_SEQ = 1 
+		        AND (E.GT_DEPT_TYPE IS NOT NULL AND E.GT_DEPT_TYPE NOT IN ('DP3000')) 
+		    UNION ALL
+		    SELECT 
+		        #{dlt_abroad_seq} AS dlt_dept_seq
+		        , #{dlt_abroad_nm} AS dlt_dept_nm
+		    FROM DUAL
+		) A
+		ORDER BY A.dlt_dept_seq  
+	]]>
+	</select>
+	
+	<select id="select_dept_combobox_list" parameterType="java.util.Map" resultType="Map">
+	<![CDATA[ 
+		SELECT * FROM (
+		    SELECT 
+		        E.DEPT_SEQ AS dlt_dept_seq
+		        , E.DEPT_NM AS dlt_dept_nm
+		    FROM TB_DEPT E 
+		    WHERE E.PARENT_DEPT_SEQ = 1 
+		        AND (E.GT_DEPT_TYPE IS NOT NULL AND E.GT_DEPT_TYPE NOT IN ('DP3000')) 
+		    UNION ALL
+		    SELECT 
+		        140 AS dlt_dept_seq
+		        , '학교' AS dlt_dept_nm
+		    FROM DUAL 
+		    UNION ALL
+		    SELECT 
+		        150 AS dlt_dept_seq
+		        , '유학센터' AS dlt_dept_nm
+		    FROM DUAL
+		    UNION ALL
+		    SELECT 
+		        9 AS dlt_dept_seq
+		        , '정상어학원' AS dlt_dept_nm
+		    FROM DUAL
+		    UNION ALL
+		    SELECT 
+		        10 AS dlt_dept_seq
+		        , '정상수학학원' AS dlt_dept_nm
+		    FROM DUAL
+		    UNION ALL
+		    SELECT 
+		        301 AS dlt_dept_seq
+		        , 'IrLibrary' AS dlt_dept_nm
+		    FROM DUAL
+		) A
+		ORDER BY A.dlt_dept_seq
+	]]>
+	</select>
+	
+	<select id="select_dept_news_top_list" parameterType="java.util.Map" resultType="Map">
+	<![CDATA[ 
+		SELECT * FROM (
+		    SELECT 
+		        E.DEPT_SEQ AS dlt_dept_seq
+		        , E.DEPT_NM AS dlt_dept_nm
+		    FROM TB_DEPT E 
+		    WHERE E.PARENT_DEPT_SEQ = 1 
+		        AND (E.GT_DEPT_TYPE IS NOT NULL AND E.GT_DEPT_TYPE NOT IN ('DP3000')) 
+		    UNION ALL
+		    SELECT 
+		        140 AS dlt_dept_seq
+		        , '학교' AS dlt_dept_nm
+		    FROM DUAL
+		    UNION ALL
+		    SELECT 
+		        150 AS dlt_dept_seq
+		        , '유학센터' AS dlt_dept_nm
+		    FROM DUAL
+		) A
+		ORDER BY A.dlt_dept_seq
+	]]>
+	</select>
+	
+	<select id="select_dept_sub_list" parameterType="branch" resultType="branch">
+	<![CDATA[
+		SELECT 
+			D.DELEGATE_WEB_DEPT_SEQ AS dlt_dept_seq
+			, D.DELEGATE_WEB_NAME AS dlt_dept_nm 
+		FROM GAIMS.TB_DEPT D
+		WHERE D.DELEGATE_WEB_YN = 1 
+	]]>
+ 		<if test="parent_dept_seq != null and parent_dept_seq == 120">
+	     AND D.GT_DEPT_COURSE IN ('DP2001', 'DP2002')
+ 		</if>
+ 		<if test="parent_dept_seq != null and parent_dept_seq == 130">
+	     AND D.GT_DEPT_COURSE IN ('DP2003', 'DP2004', 'DP2005', 'DP2006')
+ 		</if> 
+	<![CDATA[	
+		 AND D.GT_DEPT_OPR_TYPE IN ('DP4001','DP4003')
+		 AND D.GT_WEB_OPEN = 'DP1001'
+	     AND D.USE_YN = 1 
+		ORDER BY D.DELEGATE_WEB_NAME 
+	]]>
+	</select>
+	
+	<select id="select_dept_course_list" resultType="branch">
+	<![CDATA[
+		SELECT 
+			COMMON_CODE AS course_seq
+			, KOR_CODE_NAME AS course_nm
+		FROM GAIMS.GT_CODE
+		WHERE COMMON_CODE IN ('DP2001','DP2002','DP2003','DP2007')
+		ORDER BY SORT_SEQUENCE	
+	]]>
+	</select>
+	
+	<select id="select_tag_view_list" resultType="tagcode">
+	<![CDATA[ SELECT BRANCH_TAG_CODE AS tag_code, TAG_NM AS tag_nm FROM TB_BRANCH_TAG WHERE MAIN_VIEW > 0 ORDER BY MAIN_VIEW ]]>
+	</select>
+	
+	<select id="select_tag_box_list" resultType="tagcode"> 
+	<![CDATA[ SELECT A.BRANCH_TAG_CODE AS tag_code, A.TAG_NM AS tag_nm  FROM GOJLS.TB_BRANCH_TAG A WHERE A.VIEW_YN = 1 ORDER BY A.TAG_NM ]]>
+	</select>
+	
+	<select id="select_abroad_dept_list" parameterType="sch" resultType="branch">
+	<![CDATA[ SELECT DEPT_SEQ AS dept_seq, DEPT_NM AS dept_nm,
+		      REPLACE(REPLACE(REPLACE(DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+	 		  FROM GAIMS.TB_DEPT 
+	 		  WHERE DEPT_SEQ IN ]]>
+	 			<foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach>
+	 			<![CDATA[ ORDER BY SORT_SEQ ]]>
+	</select>
+	
+	<select id="select_abroad_dept_user" parameterType="sch" resultType="branch">
+	<![CDATA[
+		SELECT A.DEPT_SEQ AS dept_seq
+		    , REPLACE(REPLACE(REPLACE(C.DEPT_NM, '어학', ''),'CHESS', 'C'),'ACE', 'A') AS dept_nm2
+		    , C.DEPT_NM AS dept_nm
+		    , B.USER_SEQ AS user_seq
+		    , D.USER_NM AS user_nm
+		FROM GAIMS.TB_CLS_MST A
+		    , GAIMS.TB_CLS_USER B
+		    , GAIMS.TB_DEPT C
+		    , GAIMS.TB_US_USER D
+		WHERE A.DEPT_SEQ IN
+			]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach><![CDATA[ 
+		    AND A.CLS_SEQ = B.CLS_SEQ
+		    AND B.START_DT < B.END_DT
+		    AND TO_CHAR(SYSTIMESTAMP,'YYYYMMDD') <= B.END_DT
+		    AND B.USER_SEQ = D.USER_SEQ
+		    AND A.DEPT_SEQ = C.DEPT_SEQ
+	]]>
+	</select>
+	
+	<select id="select_dept_list" resultType="branch">
+	<![CDATA[ 
+       SELECT 
+	       DEPT_SEQ AS dept_seq
+	       , DEPT_NM AS dept_nm    
+	   FROM GAIMS.TB_DEPT  
+	   WHERE GT_DEPT_COURSE IN ('DP2001', 'DP2002')
+	   AND GT_WEB_OPEN = 'DP1001'
+	   AND GT_DEPT_OPR_TYPE IN ('DP4001', 'DP4002', 'DP4003') 
+	   AND USE_YN = 1   
+	   ORDER BY GT_DEPT_COURSE, GT_DEPT_OPR_TYPE, DEPT_NM
+	]]>
+	</select>
+	
+	
+	
+</mapper>

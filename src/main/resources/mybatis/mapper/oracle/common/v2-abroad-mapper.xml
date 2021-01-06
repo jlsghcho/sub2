@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_AbroadDao">
+	<select id="select_site_menu_list" parameterType="String" resultType="site_menu">
+	<![CDATA[
+	SELECT A.MENU_SEQ AS menu_seq
+	    , A.MENU_NM AS menu_nm
+	    , A.PARENT_MENU_SEQ AS parent_menu_seq
+	    , A.ORDER_NUM AS sort_num
+	    , A.USE_YN AS use_yn
+	    , A.TREE_LEV AS tree_lev
+	    , A.CAT_SEQ_ARR AS menu_cat_arr
+	    , A.URL AS menu_url
+	    , A.SUB_MENU_CODES AS sub_menu_codes
+	FROM VW_SITE_MENU_TREE A
+	WHERE A.SITE_TYPE = #{site_type}
+	ORDER BY A.RNUM ASC
+	]]>
+	</select>
+	
+	<select id="select_site_sub_menu_list" resultType="site_menu">
+	<![CDATA[ SELECT SUB_MENU_CODE AS sub_menu_code, SUB_MENU_NM AS sub_menu_nm FROM TB_SITE_SUB_MENU ORDER BY SUB_MENU_CODE ]]>
+	</select>
+	
+	<select id="select_site_menu_add_num" parameterType="int" resultType="int">
+	<![CDATA[ SELECT COUNT(1)+1 FROM TB_SITE_MENU WHERE PARENT_MENU_SEQ = #{parent_menu_seq} ]]>
+	</select>
+	
+	<insert id="insert_site_menu" parameterType="site_menu">
+	<![CDATA[
+		INSERT INTO TB_SITE_MENU(MENU_SEQ, SITE_TYPE, MENU_NM, ORDER_NUM, PARENT_MENU_SEQ, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, USE_YN, SUB_MENU_CODES)
+		VALUES(MENU_SEQ.NEXTVAL, #{site_type}, #{menu_nm}, #{sort_num}, #{parent_menu_seq}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm}, #{use_yn}, #{sub_menu_codes})
+	]]>
+	</insert>
+
+	<update id="update_site_menu" parameterType="site_menu">
+	<![CDATA[
+		UPDATE TB_SITE_MENU SET 
+		    MENU_NM = #{menu_nm}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}
+		    , MOD_USER_ID=#{reg_user_id}, MOD_USER_NM=#{reg_user_nm}, USE_YN=#{use_yn}
+		    , SUB_MENU_CODES = #{sub_menu_codes}
+		WHERE MENU_SEQ = #{menu_seq}
+	]]>
+	</update>
+	
+	<update id="update_site_menu_sort" parameterType="site_menu">
+	<![CDATA[
+		UPDATE TB_SITE_MENU SET 
+		    ORDER_NUM = #{sort_num}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_ID=#{reg_user_id}, MOD_USER_NM=#{reg_user_nm}
+		WHERE MENU_SEQ = #{menu_seq}	
+	]]>
+	</update>
+	
+	<!-- Banner Area -->
+	<select id="select_site_main_banner" parameterType="String" resultType="site_banner">
+	<![CDATA[
+		SELECT A.MENU_SEQ AS menu_seq
+		    , B.MENU_BANNER_SEQ AS menu_banner_seq 
+		    , NVL(B.TITLE , A.MENU_NM) AS title
+		    , NVL(B.STATUS, 99) AS status
+		    , NVL(B.VIEW_YN, 0) AS view_yn
+		    , B.IMG_PATH AS img_path
+		    , NVL(B.ORDER_NUM, 0) AS order_num
+			, (CASE WHEN B.MOD_TS IS NOT NULL THEN TO_CHAR(B.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(B.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+			, (CASE WHEN B.MOD_TS IS NOT NULL THEN B.MOD_USER_SEQ ELSE B.REG_USER_SEQ END ) AS reg_user_seq
+			, (CASE WHEN B.MOD_TS IS NOT NULL THEN B.MOD_USER_NM ELSE B.REG_USER_NM END ) AS reg_user_nm
+		FROM VW_SITE_MENU_TREE A
+		    LEFT JOIN TB_SITE_MENU_BANNER B
+		    ON A.MENU_SEQ = B.MENU_SEQ
+		WHERE A.TREE_LEV = 2
+			AND A.USE_YN = 'Y'
+		    AND A.SITE_TYPE = #{site_type}
+		ORDER BY NVL(B.ORDER_NUM, 0) ASC
+		    , A.ORDER_NUM ASC
+	]]>
+	</select>
+	
+	<update id="update_site_banner_sort" parameterType="site_banner">
+	<![CDATA[ UPDATE TB_SITE_MENU_BANNER SET ORDER_NUM = #{order_num} WHERE MENU_BANNER_SEQ = #{menu_banner_seq} ]]>
+	</update>
+	
+	<insert id="insert_site_banner" parameterType="site_banner">
+	<![CDATA[
+		INSERT INTO TB_SITE_MENU_BANNER(MENU_BANNER_SEQ, SITE_TYPE, MENU_SEQ, TITLE, STATUS, VIEW_YN, IMG_PATH, ORDER_NUM, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+		VALUES(MENU_BANNER_SEQ.NEXTVAL, #{site_type}, #{menu_seq}, #{title}, #{status}, #{view_yn}, #{img_path}, #{order_num}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]> 
+	</insert>
+
+	<update id="update_site_banner" parameterType="site_banner">
+	<![CDATA[ 
+		UPDATE TB_SITE_MENU_BANNER SET 
+		    TITLE = #{title}, IMG_PATH = #{img_path}, STATUS = #{status}, VIEW_YN = #{view_yn}
+		    , MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_ID=#{reg_user_id}, MOD_USER_NM=#{reg_user_nm}
+		WHERE MENU_BANNER_SEQ = #{menu_banner_seq}
+	]]>
+	</update>
+
+	
+	<!-- Partner Area -->
+	<select id="select_site_partner" parameterType="String" resultType="site_partner">
+	<![CDATA[
+		SELECT 
+		    A.PARTNER_SEQ AS partner_seq
+		    , A.PARTNER_TYPE AS partner_type
+		    , A.PARTNER_NM AS partner_nm
+		    , A.IMG_PATH AS img_path
+		    , A.LINK_URL AS link_url
+		    , A.ORDER_NUM AS order_num
+		FROM TB_SITE_PARTNER A
+		WHERE A.SITE_TYPE = #{site_type}
+		ORDER BY (CASE WHEN A.PARTNER_TYPE = 'USA' THEN 1 ELSE 2 END ) ASC	
+			, ORDER_NUM ASC 
+	]]>
+	</select>
+	
+	<select id="select_site_partner_sort" parameterType="site_partner" resultType="int">
+	<![CDATA[ SELECT COUNT(1)+1 FROM TB_SITE_PARTNER WHERE SITE_TYPE = #{site_type} AND PARTNER_TYPE = #{partner_type} ]]>
+	</select>
+	
+	<insert id="insert_site_partner" parameterType="site_partner">
+	<![CDATA[
+		INSERT INTO TB_SITE_PARTNER(PARTNER_SEQ, SITE_TYPE, PARTNER_TYPE, PARTNER_NM, IMG_PATH, LINK_URL, ORDER_NUM)
+		VALUES(PARTNER_SEQ.NEXTVAL, #{site_type}, #{partner_type}, #{partner_nm}, #{img_path}, #{link_url}, #{order_num})
+	]]>
+	</insert>
+	
+	<update id="update_site_partner" parameterType="site_partner">
+	<![CDATA[ UPDATE TB_SITE_PARTNER SET PARTNER_NM = #{partner_nm}, IMG_PATH = #{img_path}, LINK_URL = #{link_url} WHERE PARTNER_SEQ = #{partner_seq} ]]>
+	</update>
+	
+	<update id="update_site_partner_sort" parameterType="site_partner">
+	<![CDATA[ UPDATE TB_SITE_PARTNER SET ORDER_NUM = #{order_num} WHERE PARTNER_SEQ = #{partner_seq} ]]>
+	</update>
+	
+	<delete id="delete_site_partner" parameterType="int">
+	<![CDATA[ DELETE FROM TB_SITE_PARTNER WHERE PARTNER_SEQ = #{partner_seq} ]]>
+	</delete>
+	
+	<!-- Manager Area -->
+	<select id="select_site_manager" parameterType="String" resultType="site_manager">
+	<![CDATA[
+		SELECT A.STAFF_SEQ AS staff_seq 
+		    , A.SITE_TYPE AS site_type
+		    , A.STAFF_NM AS staff_nm
+		    , A.STAFF_DESC AS staff_desc
+		    , A.IMG_PATH AS img_path
+		    , A.ORDER_NUM AS order_num
+		FROM TB_SITE_STAFF A
+		WHERE A.SITE_TYPE = #{site_type}
+		ORDER BY A.ORDER_NUM	
+	]]>
+	</select>
+	
+	<select id="select_site_manager_sort" parameterType="site_manager" resultType="int">
+	<![CDATA[ SELECT COUNT(1)+1 FROM TB_SITE_STAFF WHERE SITE_TYPE = #{site_type} ]]>
+	</select>
+	
+	<insert id="insert_site_manager" parameterType="site_manager">
+	<![CDATA[
+		INSERT INTO TB_SITE_STAFF(STAFF_SEQ, SITE_TYPE, STAFF_NM, STAFF_DESC, IMG_PATH, ORDER_NUM, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+		VALUES(STAFF_SEQ.NEXTVAL, #{site_type}, #{staff_nm}, #{staff_desc}, #{img_path}, #{order_num}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert>
+	
+	<update id="update_site_manager" parameterType="site_manager">
+	<![CDATA[ UPDATE TB_SITE_STAFF SET STAFF_NM = #{staff_nm}, IMG_PATH = #{img_path}, STAFF_DESC = #{staff_desc}, MOD_TS=SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_ID=#{reg_user_id}, MOD_USER_NM=#{reg_user_nm} WHERE STAFF_SEQ = #{staff_seq} ]]>
+	</update>
+	
+	<delete id="delete_site_manager" parameterType="int">
+	<![CDATA[ DELETE FROM TB_SITE_STAFF WHERE STAFF_SEQ = #{manager_seq} ]]>
+	</delete>
+	
+	<update id="update_site_manager_sort" parameterType="site_manager">
+	<![CDATA[ UPDATE TB_SITE_STAFF SET ORDER_NUM = #{order_num} WHERE STAFF_SEQ = #{staff_seq} ]]>
+	</update>
+	
+	<!-- menu content Area -->
+	<select id="select_site_program_list" parameterType="String" resultType="site_program">
+	<![CDATA[
+		SELECT A.PARENT_MENU_SEQ AS parent_menu_seq
+		    , (SELECT B.MENU_NM FROM TB_SITE_MENU B WHERE B.MENU_SEQ = A.PARENT_MENU_SEQ) AS parent_menu_nm
+		    , A.MENU_SEQ AS menu_seq
+		    , A.MENU_NM AS menu_nm
+		    , TO_CHAR(CC.REG_TS,'YYYYMMDD') AS reg_ts 
+		    , CC.REG_USER_NM AS reg_user_nm
+		FROM TB_SITE_MENU A
+		    LEFT OUTER JOIN
+		        (SELECT * FROM ( SELECT ROW_NUMBER() OVER (PARTITION BY AA.MENU_SEQ ORDER BY AA.REG_TS DESC) AS rnum, AA.* FROM (
+		        SELECT B.MENU_SEQ , (CASE WHEN B.MOD_TS = NULL THEN B.REG_TS WHEN B.MOD_TS > B.REG_TS THEN B.MOD_TS ELSE B.REG_TS END) AS REG_TS
+		            , (CASE WHEN B.MOD_TS = NULL THEN B.REG_USER_NM WHEN B.MOD_TS > B.REG_TS THEN B.MOD_USER_NM ELSE B.REG_USER_NM END) AS REG_USER_NM
+		        FROM TB_SITE_MENU_CONTENT B 
+		        )AA ) BB WHERE RNUM = 1 ) CC
+		    ON A.MENU_SEQ = CC.MENU_SEQ 
+		WHERE A.SITE_TYPE = #{site_type}
+		    AND A.PARENT_MENU_SEQ > 0
+		    AND A.USE_YN = 'Y'
+		ORDER BY A.PARENT_MENU_SEQ, A.ORDER_NUM
+	]]>
+	</select>
+
+	<select id="select_site_program_sub_list" parameterType="site_program" resultType="site_program">
+	<![CDATA[
+		SELECT A.CONTENT_TYPE AS content_type
+		    , A.TITLE AS title
+		    , A.CONTENTS AS contents
+		    , A.VIDEO_URL AS video_url
+		    , A.THUMBNAIL_PATH AS thumbnail_path
+		    , A.MENU_CONTENT_SEQ AS menu_content_seq
+		FROM TB_SITE_MENU_CONTENT A
+		WHERE A.MENU_SEQ = #{menu_seq}
+		    AND A.SITE_TYPE = #{site_type}
+		    AND A.USE_YN = 'Y' 
+	]]>
+	</select>
+
+	<insert id="insert_site_program" parameterType="site_program">
+	<![CDATA[
+		INSERT INTO TB_SITE_MENU_CONTENT(MENU_CONTENT_SEQ, SITE_TYPE, MENU_SEQ, CONTENT_TYPE, TITLE, CONTENTS, VIDEO_URL, THUMBNAIL_PATH, ORDER_NUM, USE_YN, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM)
+		VALUES(MENU_CONTENT_SEQ.NEXTVAL, #{site_type}, #{menu_seq}, #{content_type}, #{title}, #{contents}, #{video_url}, #{thumbnail_path}, #{order_num}, #{use_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_id}, #{reg_user_nm})
+	]]>
+	</insert> 
+	
+	<update id="update_site_program" parameterType="site_program">
+	<![CDATA[ UPDATE TB_SITE_MENU_CONTENT SET TITLE = #{title}, CONTENTS = #{contents}, VIDEO_URL = #{video_url}, THUMBNAIL_PATH=#{thumbnail_path}, MOD_TS=SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_ID=#{reg_user_id}, MOD_USER_NM=#{reg_user_nm} WHERE MENU_CONTENT_SEQ = #{menu_content_seq} ]]>
+	</update>
+		
+	<delete id="delete_site_program" parameterType="int">
+	<![CDATA[ DELETE FROM TB_SITE_MENU_CONTENT WHERE MENU_CONTENT_SEQ = #{menu_content_seq} ]]>
+	</delete>
+
+</mapper> 

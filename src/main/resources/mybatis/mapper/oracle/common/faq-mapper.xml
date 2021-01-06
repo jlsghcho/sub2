@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.FaqDao">
+	<select id="selectTypeList" parameterType="java.util.Map" resultType="Map">
+		WITH CUS AS (
+			SELECT CATE_ID, COUNT(CATE_ID) AS USED FROM UCHESS.TB_FAQDETAIL
+			WHERE SITE_ID IN ('9','10')
+			GROUP BY CATE_ID
+		)
+		SELECT SITE_ID, FC.CATE_ID, CATE_NAME, CATE_SORT, NVL(USED, 0) AS USED
+		FROM UCHESS.TB_FAQCATEGORY FC 
+		LEFT JOIN CUS
+			ON FC.CATE_ID = CUS.CATE_ID
+		WHERE 1=1
+			AND FC.SITE_ID = #{site_id}
+	</select>   
+	
+	
+	<select id="selectFaqList" parameterType="java.util.Map" resultType="Map">
+		WITH CUS AS (
+			SELECT FD.CATE_ID, FC.CATE_NAME, COUNT(FD.CATE_ID) AS USED 
+			FROM UCHESS.TB_FAQDETAIL FD
+			LEFT JOIN UCHESS.TB_FAQCATEGORY  FC
+				ON FD.CATE_ID = FC.CATE_ID
+				AND FD.SITE_ID = FC.SITE_ID  
+			WHERE FD.SITE_ID IN ('9','10')
+			GROUP BY FD.CATE_ID, FC.CATE_NAME
+		)
+		SELECT SITE_ID, FD.CATE_ID
+		, CASE 	 
+				 WHEN SITE_ID = '9' THEN '정상어학원'
+				 WHEN SITE_ID = '10' THEN '정상수학학원'  
+				 END AS SITE_NM
+		, SUBJECT, USE_YN
+		, CASE 	    
+				 WHEN USE_YN = 'Y' THEN 'On'  
+				 WHEN USE_YN = 'N' THEN 'Off'
+				 END AS ACTIVE
+		, FD.REG_NAME  
+		, TO_CHAR(REG_DT, 'YYYYMMDD') AS REG_DT_ORG
+		, TO_CHAR(REG_DT, 'YYYYMMDD') AS REG_DT
+		, COUNT, CATE_NAME, FD.SEQ_NO
+		FROM UCHESS.TB_FAQDETAIL FD
+		LEFT JOIN CUS
+			ON FD.CATE_ID = CUS.CATE_ID
+		WHERE 1=1
+			<choose>
+				<when test="site_id == 'ALL'">
+					AND FD.SITE_ID in ('9','10')						
+				</when>
+				<otherwise>
+					AND FD.SITE_ID = #{site_id}			
+				</otherwise>
+			</choose>
+        	AND FD.CATE_ID IN
+	        <foreach collection="cate_id" item="cate" separator="," open="(" close=")">
+				#{cate}
+			</foreach>
+        	AND FD.USE_YN IN
+	        <foreach collection="use_yn" item="use" separator="," open="(" close=")">
+				#{use}
+			</foreach>
+			<if test="searchTitle != null and searchTitle != ''"> 
+			AND UPPER(SUBJECT) LIKE '%'|| UPPER(#{searchTitle}) ||'%' 
+			</if>
+		ORDER BY REG_DT_ORG DESC
+	</select>
+	
+	<resultMap id="slFaqDetail" type="Map"> 
+		<result property="CONTENTS" column="CONTENTS" jdbcType="CLOB" javaType="java.lang.String" />
+	</resultMap>
+	
+	<select id="selectFaqDetail" parameterType="java.util.Map" resultType="Map" resultMap="slFaqDetail">
+		SELECT SITE_ID, SUBJECT, USE_YN, CONTENTS, CATE_ID
+		FROM UCHESS.TB_FAQDETAIL 
+		WHERE  SEQ_NO = #{seq_no}
+			AND SITE_ID = #{site_id}
+		
+	</select>
+	
+	<insert id="insert_faq" parameterType="java.util.Map">
+		<selectKey keyProperty="seq_no" resultType="string" order="BEFORE">
+			SELECT NVL(MAX(seq_no),0)+1 FROM UCHESS.TB_FAQDETAIL WHERE site_id = #{site_id}
+		</selectKey>         
+	  
+		INSERT INTO UCHESS.TB_FAQDETAIL(SITE_ID, CATE_ID, SEQ_NO, SUBJECT, CONTENTS, USE_YN, REG_SEQ, REG_DT, REG_NAME )
+		VALUES(#{site_id}, #{cate_id}, #{seq_no}, #{subject}, #{contents}, #{use_yn}, #{reg_seq}, SYSDATE, #{reg_name})
+	</insert>
+	
+	<update id="update_faq" parameterType="java.util.Map">
+		UPDATE  UCHESS.TB_FAQDETAIL 
+		SET SUBJECT = #{subject},  CONTENTS = #{contents}, MOD_SEQ = #{reg_seq}, MOD_NAME = #{reg_name}, USE_YN = #{use_yn}
+		WHERE SITE_ID = #{site_id} AND SEQ_NO = #{seq_no}
+	</update>
+	
+	<delete id="delete_faq" parameterType="java.util.Map">
+		DELETE FROM UCHESS.TB_FAQDETAIL
+		WHERE SITE_ID = #{site_id} AND SEQ_NO = #{seq_no}
+	</delete>
+	
+	<select id="select_type_max_cate" resultType="string" >
+			SELECT NVL(MAX(cate_id),0)+1 FROM UCHESS.TB_FAQCATEGORY WHERE site_id = '9'
+	</select>
+	
+	<insert id="insert_type" parameterType="java.util.Map">
+		INSERT INTO UCHESS.TB_FAQCATEGORY(SITE_ID, CATE_ID, CATE_NAME, CATE_COMMENT, REG_ID, REG_DT, MOD_ID, MOD_DT, CATE_SORT )
+		VALUES(#{site_id}, #{cate_id}, #{cate_name}, #{cate_name}, #{reg_seq}, SYSDATE, #{reg_seq}, SYSDATE, #{cate_sort})
+	</insert>
+	
+	<update id="update_type" parameterType="java.util.Map">
+		UPDATE  UCHESS.TB_FAQCATEGORY  
+		SET CATE_SORT = #{cate_sort}, CATE_NAME = #{cate_name}, MOD_ID = #{reg_seq},  CATE_COMMENT = #{cate_name}, MOD_DT = SYSDATE 
+		WHERE SITE_ID = #{site_id} AND CATE_ID = #{cate_id}
+	</update>
+	
+	<delete id="delete_type" parameterType="java.util.Map">
+		DELETE FROM UCHESS.TB_FAQCATEGORY
+		WHERE SITE_ID = #{site_id} AND CATE_ID = #{cate_id}
+	</delete>
+	
+</mapper>

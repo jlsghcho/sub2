@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<property name="RUN_MODE" value="SERVICE" />
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+	    <layout class="ch.qos.logback.classic.PatternLayout">
+			<Pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</Pattern>
+		</layout>
+	</appender>
+
+	<if condition='property("RUN_MODE").equals("SERVICE")'>
+		<then> 
+			<property name="LOG_DIR" value="/Users/armdiri_mac/program/Data_N/newStsWork_Home/logs" /> 
+		</then>
+	 	<else> 
+	 		<property name="LOG_DIR" value="/home/gojls/program/tomcat8-gojls/logs" /> 
+	 	</else>
+	 </if>
+	<property name="LOG_PATH_NAME" value="${LOG_DIR}/manage-webapp.log" />
+	<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH_NAME}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH_NAME}.%d{yyyy-MM-dd}</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder><pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{35} - %msg%n</pattern></encoder>
+		<!--  
+		<encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder" >
+		     <providers>
+		           <pattern><pattern>{"serviceID":"openAPI"}</pattern></pattern>
+		           <timestamp><pattern>yyyy-MM-dd HH:mm:ss.SSS</pattern></timestamp>
+		           <threadName/><message/><loggerName/><logLevel/><stackTrace/><callerData/>
+		      </providers>
+		</encoder>
+		-->      
+    </appender>
+    <logger name="org.mybatis.spring" level="info"/>
+	<logger name="org.springframework" level="info"/>
+	<logger name="org.apache" level="info"/>
+    <logger name="com.gojls.manage" level="debug"/><!-- package name Setting -->
+	<if condition='property("RUN_MODE").equals("SERVICE")'>
+		<then>
+           <root level="debug"><appender-ref ref="STDOUT"/><appender-ref ref="FILE"/></root>
+		</then>
+       	<else>
+       		<root level="error"><appender-ref ref="STDOUT"/><appender-ref ref="FILE"/></root>
+       	</else>
+	</if>	 
+</configuration>

@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.v2_NewsDao">
+	<select id="select_news_list" parameterType="sch" resultType="notice">
+	
+		SELECT * FROM (
+		    SELECT
+				ROW_NUMBER() OVER (ORDER BY AA.org_reg_ts DESC) AS rnum
+				, AA.* 
+			FROM (
+		        SELECT
+		            A.BRANCH_NOTICE_SEQ AS notice_seq
+		            , B.BRANCH_NOTICE_CONTNT_SEQ AS notice_content_seq
+		            , (CASE 
+		                WHEN A.DEPT_SEQ = 1 OR A.DEPT_SEQ = 120 OR A.DEPT_SEQ = 130 OR A.DEPT_SEQ = 150 THEN 1
+		                ELSE 2 END
+		            ) AS notice_type
+		            , A.DEPT_SEQ AS dept_seq
+		            , (CASE 
+		                WHEN A.DEPT_SEQ = 150 THEN '유학센터'
+		                WHEN A.DEPT_SEQ = 120 OR A.DEPT_SEQ = 130 THEN (SELECT C.DEPT_NM FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ = A.DEPT_SEQ)
+		                ELSE (SELECT NVL((SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ = C.DELEGATE_WEB_DEPT_SEQ), C.DEPT_NM) FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ = A.DEPT_SEQ) END
+		            )AS dept_nm				
+		            , B.TITLE AS title
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_SEQ ELSE A.REG_USER_SEQ END ) AS reg_user_seq
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_NM ELSE A.REG_USER_NM END ) AS reg_user_nm
+					, (CASE WHEN A.MOD_TS IS NOT NULL THEN TO_CHAR(A.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(A.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+					, TO_CHAR(A.REG_TS, 'YYYYMMDD') AS org_reg_ts
+		            , REPLACE(A.START_DT,'-','') AS start_dt
+		            , REPLACE(A.END_DT,'-','') AS end_dt
+		            , <![CDATA[NVL((
+		                CASE 
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') >= A.START_DT AND TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') <= A.END_DT THEN 1
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') < A.START_DT THEN 2
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') > A.END_DT THEN 99
+		                END
+		            ),99) AS use_status ]]>
+		            , A.VIEW_CNT AS view_cnt
+		            , A.VIEW_YN AS view_yn
+		        FROM GOJLS.TB_BRANCH_NOTICE A
+		            , GOJLS.TB_BRANCH_NOTICE_CONTNT B
+		        WHERE A.BRANCH_NOTICE_CONTNT_SEQ = B.BRANCH_NOTICE_CONTNT_SEQ
+		       
+		        <if test="search_tag != null and !search_tag.isEmpty">
+				<![CDATA[
+					AND A.BRANCH_NOTICE_CONTNT_SEQ in (
+				        SELECT C.BRANCH_NOTICE_CONTNT_SEQ 
+				        FROM TB_BRANCH_NOTICE_TAG C, TB_BRANCH_TAG D 
+						WHERE C.BRANCH_TAG_CODE = D.BRANCH_TAG_CODE 
+							AND C.BRANCH_TAG_CODE IN ]]>
+							<foreach collection="search_tag" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+							<![CDATA[
+							AND D.VIEW_YN=1
+		    		)
+				]]> 
+				</if>
+		        
+		        UNION ALL
+		        
+				SELECT NOTICE_HP_SEQ
+					, NOTICE_HP_SEQ AS notice_content_seq
+					, 1 AS notice_type
+					, 140 AS dept_seq
+					, '학교' AS dept_nm
+					, TITLE
+					, (CASE WHEN MOD_TS IS NOT NULL THEN MOD_USER_SEQ ELSE REG_USER_SEQ END ) AS reg_user_seq
+					, (CASE WHEN MOD_TS IS NOT NULL THEN MOD_USER_NM ELSE REG_USER_NM END ) AS reg_user_nm 
+					, TO_CHAR(REG_TS, 'YYYYMMDD') AS reg_ts
+					, TO_CHAR(REG_TS, 'YYYYMMDD') AS org_reg_ts
+					, REPLACE(START_DT,'-','') AS start_dt
+		            , REPLACE(END_DT,'-','') AS end_dt
+					, <![CDATA[NVL(( 
+		                CASE 
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') >= START_DT AND TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') <= END_DT THEN 1
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') < START_DT THEN 2
+		                    WHEN TO_CHAR(SYSTIMESTAMP,'YYYY-MM-DD') > END_DT THEN 99
+		                END
+		           		 ),99) AS use_status ]]>
+					, CNT AS view_cnt 
+					, MOVIE_YN AS view_yn 
+				FROM GAIMS.TB_NOTICE_CHESSPLUS_HP
+		        
+		        <if test="search_tag != null and !search_tag.isEmpty">
+				<![CDATA[
+				WHERE NOTICE_HP_SEQ in (   
+			        SELECT C.NOTICE_HP_SEQ 
+			        FROM GAIMS.TB_NOTICE_CHESSPLUS_HP_TAG C, TB_BRANCH_TAG D     
+					WHERE C.NOTICE_HP_TAG_CODE = D.BRANCH_TAG_CODE 
+						AND C.NOTICE_HP_TAG_CODE IN ]]>
+						<foreach collection="search_tag" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+						<![CDATA[
+						AND D.VIEW_YN=1
+	    		)
+			]]>
+			</if>
+		        
+		        
+		    ) AA
+			WHERE 1=1
+				AND AA.notice_type IN
+	        <foreach collection="search_type" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=INTEGER} </foreach>
+	        <![CDATA[
+	        	AND AA.use_status IN
+	        ]]>
+	        <foreach collection="search_status" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=INTEGER} </foreach>
+			<if test="search_start_dt != '' and search_start_dt != null "><![CDATA[ AND AA.reg_ts >= #{search_start_dt} ]]></if>
+			<if test="search_end_dt != '' and search_end_dt != null "><![CDATA[ AND AA.reg_ts <= #{search_end_dt} ]]></if>
+			
+			<choose>
+	        	<when test="search_dept_arr != null">
+	        		<![CDATA[   
+					AND (
+						AA.dept_seq IN (
+							SELECT E.PARENT_DEPT_SEQ 
+							FROM GAIMS.TB_DEPT E 
+							WHERE E.DEPT_SEQ IN (
+								SELECT D.PARENT_DEPT_SEQ 
+								FROM GAIMS.TB_DEPT D 
+								WHERE D.DEPT_SEQ IN ]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach><![CDATA[
+							)
+						)
+						OR (AA.dept_seq IN ]]><foreach item="dept_seq" index="index" collection="search_dept_arr" open="(" separator="," close=")">#{dept_seq,jdbcType=INTEGER}</foreach><![CDATA[ ) 
+					)
+					]]>
+	        	</when>
+	        	<otherwise>
+					<if test="search_dept != '' and search_dept != null ">
+						<if test="search_dept == '120' or search_dept == '130' or search_dept == '140' or search_dept == '150'">
+						<![CDATA[
+							AND (
+								AA.dept_seq IN (
+									SELECT E.DEPT_SEQ 
+									FROM GAIMS.TB_DEPT E 
+									WHERE E.PARENT_DEPT_SEQ IN (
+										SELECT D.DEPT_SEQ 
+										FROM GAIMS.TB_DEPT D 
+										WHERE D.PARENT_DEPT_SEQ = #{search_dept}
+									)
+								) 
+								OR (AA.dept_seq = #{search_dept})
+							)
+						]]>
+						</if>
+						<if test="search_dept != '120' and search_dept != '130' and search_dept != '140' and search_dept != '150'">
+						<![CDATA[ 
+							AND (
+								AA.dept_seq IN (
+									SELECT E.PARENT_DEPT_SEQ 
+									FROM GAIMS.TB_DEPT E 
+									WHERE E.DEPT_SEQ IN (
+										SELECT D.PARENT_DEPT_SEQ 
+										FROM GAIMS.TB_DEPT D 
+										WHERE D.DEPT_SEQ = #{search_dept}
+									)
+								)
+								OR (AA.dept_seq = #{search_dept}) 
+							)
+						]]>
+						</if>
+			        </if>
+	        	</otherwise> 
+	        </choose>
+			<if test="search_context != '' and search_context != null "><![CDATA[ AND AA.title LIKE '%'|| #{search_context} ||'%' ]]></if>
+			<!-- <if test="search_tag != null and !search_tag.isEmpty">
+			<![CDATA[
+				AND EXISTS(
+			        SELECT * FROM TB_BRANCH_NOTICE_TAG C, TB_BRANCH_TAG D 
+					WHERE C.BRANCH_NOTICE_CONTNT_SEQ = AA.notice_content_seq 
+						AND C.BRANCH_TAG_CODE = D.BRANCH_TAG_CODE 
+						AND C.BRANCH_TAG_CODE IN ]]>
+						<foreach collection="search_tag" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+						<![CDATA[
+						AND D.VIEW_YN=1
+	    		)
+	    		OR EXISTS(  
+			        SELECT * FROM GAIMS.TB_NOTICE_CHESSPLUS_HP_TAG C, TB_BRANCH_TAG D   
+					WHERE C.NOTICE_HP_SEQ = AA.notice_content_seq 
+						AND C.NOTICE_HP_TAG_CODE = D.BRANCH_TAG_CODE 
+						AND C.NOTICE_HP_TAG_CODE IN ]]>
+						<foreach collection="search_tag" index="index" item="item"  open="(" close=")" separator=","> #{item,jdbcType=VARCHAR} </foreach>
+						<![CDATA[
+						AND D.VIEW_YN=1
+	    		)
+			]]>
+			</if> -->
+			<![CDATA[
+		) BB
+		WHERE BB.rnum > ( #{page_start_num} * #{page_size} ) AND BB.rnum <= ( ( #{page_start_num} * #{page_size} ) + #{page_size} )
+		ORDER BY org_reg_ts DESC    
+	]]>
+	</select>  
+	
+	<select id="select_new_view" parameterType="notice" resultType="notice">
+	<![CDATA[
+		SELECT B.THUMBNAIL_PATH AS news_img_thumb
+			, B.SUMMARY AS preview_txt
+			, B.CONTENTS AS editor_txt
+			, A.BRANCH_NOTICE_SEQ AS notice_seq
+			, B.BRANCH_NOTICE_CONTNT_SEQ AS notice_content_seq
+			, (CASE 
+				WHEN A.DEPT_SEQ = 1 OR A.DEPT_SEQ = 120 OR A.DEPT_SEQ = 130 OR A.DEPT_SEQ = 150 THEN 1
+				ELSE 2 END
+			) AS notice_type
+			, A.DEPT_SEQ AS dept_seq
+			, (CASE 
+				WHEN A.DEPT_SEQ = 150 THEN '유학센터'
+				WHEN A.DEPT_SEQ = 120 OR A.DEPT_SEQ = 130 THEN (SELECT C.DEPT_NM FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ = A.DEPT_SEQ)
+				ELSE (SELECT NVL((SELECT D.DELEGATE_WEB_NAME FROM GAIMS.TB_DEPT D WHERE D.DEPT_SEQ = C.DELEGATE_WEB_DEPT_SEQ), C.DEPT_NM) FROM GAIMS.TB_DEPT C WHERE C.DEPT_SEQ = A.DEPT_SEQ) END
+			)AS dept_nm				
+			, B.TITLE AS title
+            , REPLACE(A.START_DT,'-','') AS start_dt
+            , REPLACE(A.END_DT,'-','') AS end_dt
+		FROM GOJLS.TB_BRANCH_NOTICE A
+			, GOJLS.TB_BRANCH_NOTICE_CONTNT B
+		WHERE A.BRANCH_NOTICE_SEQ = #{notice_seq}
+			AND A.BRANCH_NOTICE_CONTNT_SEQ = B.BRANCH_NOTICE_CONTNT_SEQ
+			AND B.BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq}
+	]]>
+	</select>
+	
+	<select id="select_news_chessplus_view" parameterType="Map" resultType="notice">
+	<![CDATA[
+		SELECT 
+			NOTE AS editor_txt    
+			, SUMMARY AS preview_txt
+			, THUMBNAIL_PATH AS news_img_thumb
+			, NOTICE_HP_SEQ AS notice_seq
+			, NOTICE_HP_SEQ AS notice_content_seq  
+			, 140 notice_type
+			, 140 AS dept_seq
+			, '학교' dept_nm				
+			, TITLE AS title
+            , REPLACE(START_DT,'-','') AS start_dt
+            , REPLACE(END_DT,'-','') AS end_dt
+		FROM GAIMS.TB_NOTICE_CHESSPLUS_HP		
+		WHERE NOTICE_HP_SEQ = #{notice_seq}  
+	]]>
+	</select>  
+	
+	
+	<insert id="insert_news_save" parameterType="notice">
+		<selectKey keyProperty="notice_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_NOTICE_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BRANCH_NOTICE(BRANCH_NOTICE_SEQ, DEPT_SEQ, START_DT, END_DT, REG_TS, REG_USER_SEQ, REG_USER_NM, VIEW_YN, VIEW_CNT, USE_YN, NOTICE_TYPE_CODE, BRANCH_NOTICE_CONTNT_SEQ)
+		VALUES(#{notice_seq}, #{dept_seq}, #{start_dt}, #{end_dt}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm}, 1, 0, 1, 'NT1001', #{notice_content_seq})
+	]]>
+	</insert>
+	
+	<insert id="insert_news_content_save" parameterType="notice">
+		<selectKey keyProperty="notice_content_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_NOTICE_CONTNT_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+	<![CDATA[
+		INSERT INTO GOJLS.TB_BRANCH_NOTICE_CONTNT (BRANCH_NOTICE_CONTNT_SEQ, TITLE, THUMBNAIL_PATH, CONTENTS, REG_TS, REG_USER_SEQ, REG_USER_ID, REG_USER_NM, TOP_ORDER, DEPT_VIEW_YN, SUMMARY)
+		VALUES (#{notice_content_seq}, #{title}, #{news_img_thumb}, #{editor_txt}, SYSTIMESTAMP, #{reg_user_seq}, '', #{reg_user_nm}, 0, 1, #{preview_txt})	
+	]]>
+	</insert>
+	
+	<update id="update_news_save" parameterType="notice">
+	<![CDATA[
+		UPDATE GOJLS.TB_BRANCH_NOTICE SET
+    		START_DT=#{start_dt}, DEPT_SEQ=#{dept_seq}, END_DT=#{end_dt}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_NM=#{reg_user_nm}
+		WHERE BRANCH_NOTICE_SEQ = #{notice_seq}
+	]]>
+	</update>
+	
+	<update id="update_news_content_save" parameterType="notice">
+	<![CDATA[
+		UPDATE GOJLS.TB_BRANCH_NOTICE_CONTNT SET
+    		TITLE=#{title}, THUMBNAIL_PATH=#{news_img_thumb}, CONTENTS=#{editor_txt}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ=#{reg_user_seq}, MOD_USER_NM=#{reg_user_nm}, SUMMARY=#{preview_txt}
+		WHERE BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq}
+	]]>
+	</update>
+	
+	<delete id="delete_news" parameterType="integer">
+	<![CDATA[ DELETE FROM TB_BRANCH_NOTICE WHERE BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq} ]]>
+	</delete>
+
+	<delete id="delete_news_content" parameterType="integer">
+	<![CDATA[ DELETE FROM TB_BRANCH_NOTICE_CONTNT WHERE BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq} ]]>
+	</delete>
+
+	<delete id="delete_tag_content" parameterType="integer">
+	<![CDATA[ DELETE FROM GOJLS.TB_BRANCH_NOTICE_TAG WHERE BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq} ]]>
+	</delete>
+	
+	<delete id="delete_news_chessplus" parameterType="integer">
+	<![CDATA[ DELETE FROM GAIMS.TB_NOTICE_CHESSPLUS_HP WHERE NOTICE_HP_SEQ = #{notice_content_seq} ]]>  
+	</delete>
+	
+	<delete id="delete_chessplus_tag_content" parameterType="integer">
+	<![CDATA[ DELETE FROM GAIMS.TB_NOTICE_CHESSPLUS_HP_TAG WHERE NOTICE_HP_SEQ = #{notice_content_seq} ]]>
+	</delete>
+	
+	<insert id="insert_tag_content" parameterType="java.util.Map">
+		INSERT ALL 
+		<foreach collection="data" item="item" index="index">
+			INTO GOJLS.TB_BRANCH_NOTICE_TAG(BRANCH_TAG_CODE, BRANCH_NOTICE_CONTNT_SEQ) VALUES (#{item.tag_code}, #{item.notice_content_seq})
+		</foreach>
+		SELECT * FROM DUAL
+	</insert>
+	
+	<insert id="insert_chessplus_tag_content" parameterType="java.util.Map">
+		INSERT ALL 
+		<foreach collection="data" item="item" index="index">
+			INTO GAIMS.TB_NOTICE_CHESSPLUS_HP_TAG(NOTICE_HP_TAG_CODE, NOTICE_HP_SEQ) VALUES (#{item.tag_code}, #{item.notice_content_seq})
+		</foreach>
+		SELECT * FROM DUAL
+	</insert>
+	
+	
+	<select id="select_tag_list" parameterType="search" resultType="tagcode">    
+	<![CDATA[
+		SELECT
+		    A.BRANCH_TAG_CODE AS tag_code
+		    , A.TAG_NM AS tag_nm   
+		    , A.BRANCH_TAG_SEQ AS branch_tag_seq  
+		    , A.VIEW_YN AS view_yn
+			, (CASE WHEN A.MOD_TS IS NOT NULL THEN TO_CHAR(A.MOD_TS, 'YYYYMMDD') ELSE TO_CHAR(A.REG_TS, 'YYYYMMDD') END ) AS reg_ts
+			, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_SEQ ELSE A.REG_USER_SEQ END ) AS reg_user_seq
+			, (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_USER_NM ELSE A.REG_USER_NM END ) AS reg_user_nm
+		    , A.MAIN_VIEW AS main_view_yn 
+		    , (SELECT COUNT(1) FROM GOJLS.TB_BRANCH_NOTICE_TAG B WHERE B.BRANCH_TAG_CODE = A.BRANCH_TAG_CODE) AS tag_content_cnt
+		FROM GOJLS.TB_BRANCH_TAG A
+		WHERE 1=1
+	]]>
+	<if test="search_context != '' and search_context != null "><![CDATA[ AND A.TAG_NM LIKE '%'|| #{search_context} ||'%' ]]></if>
+	<![CDATA[  
+	ORDER BY (CASE WHEN A.MOD_TS IS NOT NULL THEN A.MOD_TS ELSE A.REG_TS END ) DESC 
+	]]>
+	</select>
+	
+	
+	<select id="select_tag_view" parameterType="int" resultType="String">
+	<![CDATA[ SELECT BRANCH_TAG_CODE FROM GOJLS.TB_BRANCH_NOTICE_TAG WHERE BRANCH_NOTICE_CONTNT_SEQ = #{notice_content_seq} ]]>
+	</select>
+	
+	<select id="select_chessplus_tag_view" parameterType="int" resultType="String">    
+	<![CDATA[ SELECT NOTICE_HP_TAG_CODE FROM GAIMS.TB_NOTICE_CHESSPLUS_HP_TAG WHERE NOTICE_HP_SEQ = #{notice_content_seq} ]]>
+	</select>  
+	
+	<insert id="insert_tag_save" parameterType="tagcode">
+		<selectKey keyProperty="branch_tag_seq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_TAG_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+		<![CDATA[
+		INSERT INTO TB_BRANCH_TAG (BRANCH_TAG_CODE, TAG_NM, BRANCH_TAG_SEQ, VIEW_YN, MAIN_VIEW, REG_TS, REG_USER_SEQ, REG_USER_NM)
+		VALUES('NTA'|| LPAD(#{branch_tag_seq}, 3, '0'), #{tag_nm}, #{branch_tag_seq}, #{view_yn}, #{main_view_yn}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm})
+		]]>
+	</insert>
+	
+	<update id="update_tag_save" parameterType="tagcode">
+	<![CDATA[ UPDATE TB_BRANCH_TAG SET TAG_NM = #{tag_nm}, VIEW_YN=#{view_yn}, MAIN_VIEW = #{main_view_yn}, MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ = #{reg_user_seq}, MOD_USER_NM = #{reg_user_nm} WHERE BRANCH_TAG_CODE = #{tag_code} ]]>
+	</update> 
+	
+	<update id="update_tag_mainview_change" parameterType="tagcode">
+	<![CDATA[ UPDATE TB_BRANCH_TAG SET MAIN_VIEW = 0 WHERE MAIN_VIEW = #{main_view_yn} ]]>
+	</update>
+	
+	<delete id="delete_tag_save" parameterType="tagcode"> 
+	<![CDATA[ DELETE FROM TB_BRANCH_TAG WHERE BRANCH_TAG_CODE = #{tag_code} ]]>
+	</delete>
+	
+	
+	<insert id="insert_news_chessplus_save" parameterType="notice">
+		<selectKey keyProperty="notice_seq" resultType="int" order="BEFORE">    
+			SELECT NVL(MAX(NOTICE_HP_SEQ),0)+1 as notice_seq FROM GAIMS.TB_NOTICE_CHESSPLUS_HP 
+		</selectKey>       
+		INSERT INTO GAIMS.TB_NOTICE_CHESSPLUS_HP(NOTICE_HP_SEQ, TITLE, THUMBNAIL_PATH, SUMMARY, NOTE, USE_YN, START_DT, END_DT, REG_TS, REG_USER_SEQ, REG_USER_NM, CNT, HOT_YN, TARGET_DEPT_SEQ, RESERVATION_DT)   
+		VALUES(#{notice_seq}, #{title}, #{news_img_thumb}, #{preview_txt}, #{editor_txt}, '1', #{start_dt}, #{end_dt}, SYSTIMESTAMP, #{reg_user_seq}, #{reg_user_nm}, 0, 0, 0, REPLACE(#{start_dt},'-',''))  
+	</insert>
+	
+	<update id="update_news_chessplus_save" parameterType="notice">
+	<![CDATA[
+		UPDATE GAIMS.TB_NOTICE_CHESSPLUS_HP SET         
+    		TITLE=#{title}
+    		, NOTE=#{editor_txt}
+    		, THUMBNAIL_PATH=#{news_img_thumb}
+    		, SUMMARY=#{preview_txt}
+    		, START_DT=#{start_dt}
+    		, END_DT=#{end_dt}
+    		, MOD_TS=SYSTIMESTAMP
+    		, MOD_USER_SEQ=#{reg_user_seq}
+    		, MOD_USER_NM=#{reg_user_nm}
+		WHERE NOTICE_HP_SEQ = #{notice_seq}
+	]]>   
+	</update>
+	
+	
+</mapper>

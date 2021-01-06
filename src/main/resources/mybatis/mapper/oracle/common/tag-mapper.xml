@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.gojls.manage.common.dao.TagDao">
+	<select id="selectTagList" parameterType="search" resultType="tag">
+	<![CDATA[
+		SELECT * FROM (
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY A1.tagNm ASC) AS rnum
+		        , A1.*
+		    FROM (
+		        SELECT
+		             A.BRANCH_TAG_CODE AS tagCode
+		            , A.TAG_NM AS tagNm
+		            , A.BRANCH_TAG_SEQ AS branchTagSeq
+		            , A.VIEW_YN AS viewYn
+		            , TO_CHAR(A.REG_TS, 'YYYY-MM-DD HH24:MI') AS regTs
+		            , A.REG_USER_SEQ AS regUserSeq
+		            , A.REG_USER_NM AS regUserNm
+		            , A.MAIN_VIEW AS mainViewYn
+		            , (SELECT COUNT(1) FROM GOJLS.TB_BRANCH_NOTICE_TAG B WHERE B.BRANCH_TAG_CODE = A.BRANCH_TAG_CODE) AS tagContntCnt
+		        FROM GOJLS.TB_BRANCH_TAG A
+		        WHERE 1 = 1
+				]]>
+				<if test="searchStartDt != '' and searchStartDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') >= #{searchStartDt} ]]></if>
+				<if test="searchEndDt != '' and searchEndDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') <= #{searchEndDt} ]]></if>
+				<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TAG_NM LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+				<if test="searchViewYn != '' and searchViewYn != null "><![CDATA[ AND A.VIEW_YN = #{searchViewYn} ]]></if>
+				<![CDATA[
+		    ) A1    
+		) B1
+		WHERE B1.rnum > ( #{jtStartIndex} ) AND B1.rnum <= ( #{jtStartIndex} + #{jtPageSize} )	
+	]]>
+	</select>
+
+	<select id="selectTagListCnt" parameterType="search" resultType="integer">
+	<![CDATA[
+        SELECT
+            COUNT(1)
+		FROM GOJLS.TB_BRANCH_TAG A
+		WHERE 1=1
+		]]>
+		<if test="searchStartDt != '' and searchStartDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') >= #{searchStartDt} ]]></if>
+		<if test="searchEndDt != '' and searchEndDt != null "><![CDATA[ AND TO_CHAR(A.REG_TS, 'YYYY-MM-DD') <= #{searchEndDt} ]]></if>
+		<if test="searchTitle != '' and searchTitle != null "><![CDATA[ AND A.TAG_NM LIKE '%'|| #{searchTitle} ||'%' ]]></if>
+		<if test="searchViewYn != '' and searchViewYn != null "><![CDATA[ AND A.VIEW_YN = #{searchViewYn} ]]></if>
+	</select>
+	
+	<select id="selectTagCheck" parameterType="tag" resultType="integer">
+	<![CDATA[
+		SELECT 
+			COUNT(*) 
+		FROM TB_BRANCH_TAG A 
+		WHERE A.TAG_NM = #{tagNm}
+	]]>
+		<if test="branchTagSeq > 0">
+			AND A.BRANCH_TAG_SEQ NOT IN (#{branchTagSeq})
+		</if>
+	</select>
+	
+	<insert id="insTag" parameterType="tag">
+		<selectKey keyProperty="branchTagSeq" resultType="int" order="BEFORE">
+			SELECT GOJLS.BRANCH_TAG_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+		<![CDATA[
+		INSERT INTO TB_BRANCH_TAG (BRANCH_TAG_CODE, TAG_NM, BRANCH_TAG_SEQ, VIEW_YN, MAIN_VIEW, REG_TS, REG_USER_SEQ, REG_USER_NM)
+		VALUES('NTA'|| LPAD(#{branchTagSeq}, 3, '0'), #{tagNm}, #{branchTagSeq}, #{viewYn}, #{mainViewYn}, SYSTIMESTAMP, #{regUserSeq}, #{regUserNm})
+		]]>
+	</insert>
+	
+	<update id="upTag" parameterType="tag">
+	<![CDATA[
+		UPDATE TB_BRANCH_TAG SET 
+		    TAG_NM = #{tagNm}, VIEW_YN=#{viewYn}, MAIN_VIEW = #{mainViewYn}
+		    , MOD_TS = SYSTIMESTAMP, MOD_USER_SEQ = #{regUserSeq}, MOD_USER_NM = #{regUserNm}
+		WHERE BRANCH_TAG_SEQ = #{branchTagSeq}
+	]]>
+	</update>
+
+	<select id="selectTagMainView" resultType="tag">
+	<![CDATA[ SELECT MAIN_VIEW AS mainViewYn FROM TB_BRANCH_TAG WHERE MAIN_VIEW > 0 AND VIEW_YN=1 ]]>
+	</select>
+</mapper>
